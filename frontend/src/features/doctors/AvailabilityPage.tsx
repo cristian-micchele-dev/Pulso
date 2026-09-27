@@ -9,6 +9,8 @@ import { Input } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import styles from './AvailabilityPage.module.css';
 import { apiErrorMessage } from '../../api/client';
+import { endOfLocalDay, startOfLocalDay } from '../../utils/date';
+import { validateBlock, validateSlot, type BlockErrors, type SlotErrors } from './availability-rules';
 
 const DAY_NAMES: Record<number, string> = {
   0: 'Domingo',
@@ -48,11 +50,6 @@ interface BlockFormState {
   reason: string;
 }
 
-interface BlockFormErrors {
-  startDate?: string;
-  endDate?: string;
-}
-
 const EMPTY_BLOCK_FORM: BlockFormState = { startDate: '', endDate: '', reason: '' };
 
 interface SlotFormState {
@@ -60,12 +57,6 @@ interface SlotFormState {
   startTime: string;
   endTime: string;
   slotDuration: string;
-}
-
-interface SlotErrors {
-  dayOfWeek?: string;
-  startTime?: string;
-  endTime?: string;
 }
 
 const EMPTY_FORM: SlotFormState = {
@@ -98,7 +89,7 @@ export function AvailabilityPage() {
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
   const [showBlockForm, setShowBlockForm] = useState(false);
   const [blockForm, setBlockForm] = useState<BlockFormState>(EMPTY_BLOCK_FORM);
-  const [blockFormErrors, setBlockFormErrors] = useState<BlockFormErrors>({});
+  const [blockFormErrors, setBlockErrors] = useState<BlockErrors>({});
   const [savingBlock, setSavingBlock] = useState(false);
 
   useEffect(() => {
@@ -154,13 +145,7 @@ export function AvailabilityPage() {
   }, [routeDoctorId]);
 
   const validateForm = (): boolean => {
-    const errs: SlotErrors = {};
-    if (!form.dayOfWeek) errs.dayOfWeek = 'Seleccioná un día';
-    if (!form.startTime) errs.startTime = 'Ingresá la hora de inicio';
-    if (!form.endTime) errs.endTime = 'Ingresá la hora de fin';
-    else if (form.startTime && form.endTime >= form.startTime === false) {
-      errs.endTime = 'La hora de fin debe ser posterior al inicio';
-    }
+    const errs = validateSlot(form, slots.map((s) => ({ id: s._id, ...s })), editingId ?? undefined);
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -233,13 +218,8 @@ export function AvailabilityPage() {
     new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   const validateBlockForm = (): boolean => {
-    const errs: BlockFormErrors = {};
-    if (!blockForm.startDate) errs.startDate = 'Ingresá la fecha de inicio';
-    if (!blockForm.endDate) errs.endDate = 'Ingresá la fecha de fin';
-    else if (blockForm.startDate && blockForm.endDate <= blockForm.startDate) {
-      errs.endDate = 'La fecha de fin debe ser posterior al inicio';
-    }
-    setBlockFormErrors(errs);
+    const errs = validateBlock(blockForm);
+    setBlockErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -248,14 +228,16 @@ export function AvailabilityPage() {
     try {
       setSavingBlock(true);
       const dto: CreateScheduleBlockDto = {
-        startDate: new Date(blockForm.startDate).toISOString(),
-        endDate: new Date(blockForm.endDate).toISOString(),
+        // Dias COMPLETOS: quien escribe 'del 18 al 20' incluye los dos. Mandar
+        // la medianoche dejaba el ultimo dia entero sin bloquear.
+        startDate: startOfLocalDay(blockForm.startDate),
+        endDate: endOfLocalDay(blockForm.endDate),
         ...(blockForm.reason.trim() ? { reason: blockForm.reason.trim() } : {}),
       };
       const saved = await doctorsApi.addBlock(resolvedDoctorId, dto);
       setBlocks((prev) => [...prev, saved].sort((a, b) => a.startDate.localeCompare(b.startDate)));
       setBlockForm(EMPTY_BLOCK_FORM);
-      setBlockFormErrors({});
+      setBlockErrors({});
       setShowBlockForm(false);
       toast.success('Bloqueo agregado correctamente');
     } catch (err) {
@@ -462,7 +444,7 @@ export function AvailabilityPage() {
                 value={blockForm.startDate}
                 onChange={(e) => {
                   setBlockForm((prev) => ({ ...prev, startDate: e.target.value }));
-                  if (blockFormErrors.startDate) setBlockFormErrors((prev) => ({ ...prev, startDate: undefined }));
+                  if (blockFormErrors.startDate) setBlockErrors((prev) => ({ ...prev, startDate: undefined }));
                 }}
                 error={blockFormErrors.startDate}
               />
@@ -472,7 +454,7 @@ export function AvailabilityPage() {
                 value={blockForm.endDate}
                 onChange={(e) => {
                   setBlockForm((prev) => ({ ...prev, endDate: e.target.value }));
-                  if (blockFormErrors.endDate) setBlockFormErrors((prev) => ({ ...prev, endDate: undefined }));
+                  if (blockFormErrors.endDate) setBlockErrors((prev) => ({ ...prev, endDate: undefined }));
                 }}
                 error={blockFormErrors.endDate}
               />
@@ -485,7 +467,7 @@ export function AvailabilityPage() {
               />
             </div>
             <div className={styles.formActions}>
-              <Button variant="secondary" size="sm" onClick={() => { setShowBlockForm(false); setBlockForm(EMPTY_BLOCK_FORM); setBlockFormErrors({}); }}>
+              <Button variant="secondary" size="sm" onClick={() => { setShowBlockForm(false); setBlockForm(EMPTY_BLOCK_FORM); setBlockErrors({}); }}>
                 Cancelar
               </Button>
               <Button variant="primary" size="sm" onClick={handleAddBlock} isLoading={savingBlock} disabled={savingBlock}>
