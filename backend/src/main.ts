@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ProblemDetailsFilter } from './shared/infra/http/problem-details.filter';
+import { PostgresIoAdapter } from './shared/infra/ws/postgres-io.adapter';
 
 export function configureApp(app: INestApplication): INestApplication {
   app.setGlobalPrefix('api/v1');
@@ -34,6 +35,16 @@ export async function createApp(module?: Type<unknown>) {
 
 async function bootstrap() {
   const app = await createApp();
+
+  // Va acá y no en configureApp: los tests e2e montan la app sin base, y pedirles
+  // un pool de Postgres para probar un controlador HTTP no tendria sentido.
+  const { Pool } = await import('pg');
+  const url = process.env.DATABASE_URL;
+  const pool = url
+    ? new Pool({ connectionString: url, ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false } })
+    : null;
+  app.useWebSocketAdapter(new PostgresIoAdapter(app, pool));
+
   await app.listen(Number(process.env.PORT ?? 3000));
 }
 

@@ -7,7 +7,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { TOKEN_SERVICE, TokenService } from '../../shared/application/ports';
 
-@WebSocketGateway({ cors: { origin: '*' } })
+@WebSocketGateway({ cors: { origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000', credentials: true } })
 export class NotificationsGateway implements OnGatewayConnection {
   @WebSocketServer() server!: Server;
 
