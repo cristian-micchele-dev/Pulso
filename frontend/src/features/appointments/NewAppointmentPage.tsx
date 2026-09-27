@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { specialtiesApi, type Specialty } from '../../api/specialties';
-import { doctorsApi, type Doctor, type Availability } from '../../api/doctors';
+import { doctorsApi, type Doctor } from '../../api/doctors';
 import { appointmentsApi } from '../../api/appointments';
 import type { ApiError } from '../../api/client';
 import type { UserProfile } from '../../api/auth';
@@ -17,6 +17,7 @@ import { Check } from 'lucide-react';
 import { addDaysLocal, localDateTimeToIso, todayLocal } from '../../utils/date';
 import styles from './NewAppointmentPage.module.css';
 import { apiErrorMessage } from '../../api/client';
+import { buildSlots } from './buildSlots';
 
 // ── Step kinds ──────────────────────────────────────────────────────────────
 type StepKind = 'patient' | 'specialty' | 'doctor' | 'datetime' | 'confirm';
@@ -52,25 +53,6 @@ function formatDisplayDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function buildSlots(availability: Availability[], date: string): string[] {
-  const dayOfWeek = new Date(date + 'T12:00:00').getDay();
-  const slots: string[] = [];
-  for (const block of availability) {
-    if (block.dayOfWeek !== dayOfWeek) continue;
-    const [startH, startM] = block.startTime.split(':').map(Number);
-    const [endH, endM] = block.endTime.split(':').map(Number);
-    let current = startH * 60 + startM;
-    const end = endH * 60 + endM;
-    const duration = block.slotDuration ?? 30;
-    while (current + duration <= end) {
-      const h = String(Math.floor(current / 60)).padStart(2, '0');
-      const m = String(current % 60).padStart(2, '0');
-      slots.push(`${h}:${m}`);
-      current += duration;
-    }
-  }
-  return slots;
-}
 
 // ── Component ────────────────────────────────────────────────────────────────
 export function NewAppointmentPage() {
