@@ -7,6 +7,8 @@ Monorepo con API REST en **NestJS** (arquitectura hexagonal) y SPA en **React**.
 
 > Proyecto de portfolio. El foco está en decisiones de dominio explícitas, arquitectura limpia y reglas de negocio testeadas — no en la cantidad de features.
 
+![Dashboard de Pulso](docs/img/dashboard.png)
+
 ---
 
 ## Decisiones de dominio
@@ -73,17 +75,19 @@ src/
 | | Backend | Frontend |
 |---|---|---|
 | Runtime | Node 24, NestJS 12, TypeScript | React 19, Vite, TypeScript |
-| Datos | PostgreSQL 16, TypeORM | TanStack Query |
+| Datos | PostgreSQL 17, TypeORM, índices GIN de trigramas | TanStack Query |
 | Auth | JWT access + refresh rotativo en cookie httpOnly (de sesión, o 30 días con "Recordarme"), CSRF, Argon2 | — |
-| Seguridad | `helmet`, rate limiting, `ValidationPipe` con whitelist estricta, RBAC | — |
+| Seguridad | `helmet`, rate limiting, `ValidationPipe` con whitelist estricta, RBAC, política NIST 800-63B, bloqueo temporal de cuenta, audit log | — |
+| Observabilidad | Logs JSON con `pino` y `x-request-id` de punta a punta, métricas Prometheus | — |
+| Escala | Sockets repartidos entre instancias vía Postgres `LISTEN/NOTIFY` | — |
 | Tests | Jest (unit · e2e · integration) | Vitest + Testing Library |
-| Calidad | ESLint, `tsc --noEmit`, coverage ≥ 68 % | oxlint, `tsc --noEmit` |
+| Calidad | ESLint, `tsc --noEmit`, coverage ≥ 77 % | oxlint, `tsc --noEmit` |
 
 ---
 
 ## Puesta en marcha
 
-Requisitos: Node 24 y una PostgreSQL 16 (local o Docker).
+Requisitos: Node 24 y una PostgreSQL 17 (local o Docker).
 
 ```bash
 # 1. Base de datos
@@ -139,7 +143,7 @@ Validadas al arrancar con `class-validator` (`src/config/env.schema.ts`). Si fal
 ```bash
 # Backend
 cd backend
-npm test                     # unit (con coverage gate 68 %)
+npm test                     # unit (con coverage gate 77 %)
 npm run test:e2e             # HTTP end-to-end con repositorios en memoria
 npm run test:integration     # contra PostgreSQL real (se saltea si no hay DATABASE_URL)
 npm run lint && npx tsc --noEmit
@@ -153,6 +157,17 @@ npm run lint && npx tsc --noEmit -p tsconfig.app.json
 El pipeline de CI (`.github/workflows/ci.yml`) corre todo lo anterior en cada push y PR, levanta un Postgres efímero, aplica **y revierte** la última migración, y hace el build de producción de ambos lados.
 
 Convención: cada cambio de comportamiento arranca con un test en rojo.
+
+**Qué cubre cada suite, y por qué son tres.** Las de integración existen porque los mocks mienten sobre
+lo que hace la base: el bug del huso horario en el gráfico mensual, la carrera del código correlativo y
+el índice de trigramas que no se usaba sólo aparecen ejecutando SQL de verdad.
+
+| Se rompió esto | Lo encontró |
+|---|---|
+| Doce reservas simultáneas dejaban once en error 500 (código correlativo calculado con leer-y-sumar) | Prueba de concurrencia contra la API real |
+| Los turnos de las 22:00 se contaban en el mes siguiente | Test de integración contra PostgreSQL |
+| Un admin podía cambiarse el rol y dejar al sistema sin ningún administrador | Ir a testear `UsersPage` |
+| Desactivar a alguien no cerraba sus sesiones | Revisión de inconsistencias |
 
 ---
 
@@ -186,6 +201,7 @@ de tocar un repositorio, y el front ni siquiera pide esos datos.
 ```
 backend/     API NestJS · src/modules/{auth,users,specialties,doctors,patients,appointments,medical-reports,prescriptions,dashboard,notifications}
 frontend/    SPA React
+backend/docs/alerts.yml   Reglas de alerta para Prometheus/Grafana
 design.md    Sistema de diseño (tokens, tipografía, componentes)
 SPEC.md      Especificación funcional original
 docker-compose.yml   Postgres + API
@@ -197,8 +213,9 @@ docker-compose.yml   Postgres + API
 
 Anotada a propósito — son decisiones de alcance, no olvidos.
 
-- **WebSocket de notificaciones en memoria.** Funciona con una instancia. Para escalar horizontalmente hace falta el adapter de Redis para Socket.IO.
-- **Sin cola de trabajo asíncrono.** Emails y notificaciones se despachan en el request. El `Mailer` actual es un no-op.
-- **Sin audit log** de acciones sensibles (cambio de rol, cancelaciones).
-- **Sin política de fortaleza de contraseña** más allá del largo mínimo.
-- **Tests de componentes React** cubren hooks y rutas protegidas, no todas las pantallas.
+- **Sin cola de trabajo asíncrono.** Emails y notificaciones se despachan dentro del request. El `Mailer` actual es un no-op.
+- **Rate limiting por instancia.** El throttler cuenta en memoria: con N instancias el límite efectivo se multiplica por N. El bloqueo de cuenta, que es la defensa que importa, sí vive en Postgres.
+- **Techo de conexiones.** Cada instancia toma hasta `DB_POOL_MAX` (10 por defecto) y el servidor tiene un `max_connections` finito. Medido contra Supabase: ~4 instancias antes de agotarlo. Para más hace falta un pooler.
+- **Restore de backup sin probar.** Supabase hace backups; nadie verificó que se puedan recuperar. Un backup no probado es una esperanza.
+- **Cinco pantallas del frontend entre 437 y 577 líneas.** El backend resuelve su pieza más compleja en ~230.
+- **Alertas sin destino.** `backend/docs/alerts.yml` tiene las reglas listas; falta dónde correr el Prometheus.
