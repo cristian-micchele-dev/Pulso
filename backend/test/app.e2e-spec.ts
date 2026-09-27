@@ -189,3 +189,30 @@ describe('foundation HTTP', () => {
     expect(locked.headers['content-type']).toContain('application/problem+json');
   });
 });
+
+describe('trazabilidad — seguirle el rastro a UN pedido', () => {
+  let app: any;
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({ imports: [E2eModule] }).compile();
+    app = configureApp(module.createNestApplication());
+    await app.init();
+  });
+  afterAll(async () => app.close());
+
+  it('toda respuesta vuelve con su x-request-id, aunque haya salido bien', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/health/live').expect(200);
+    expect(res.headers['x-request-id']).toEqual(expect.any(String));
+    expect(res.headers['x-request-id']).not.toHaveLength(0);
+  });
+
+  it('si el cliente trae el suyo, se respeta: asi se cruza el rastro entre servicios', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/health/live').set('x-request-id', 'rastro-123').expect(200);
+    expect(res.headers['x-request-id']).toBe('rastro-123');
+  });
+
+  it('el id del cuerpo del error es el MISMO que el del header, o no sirve para buscar', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
+    expect(res.body.requestId).toBe(res.headers['x-request-id']);
+  });
+});

@@ -4,10 +4,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { ProblemDetailsFilter } from './shared/infra/http/problem-details.filter';
+import { requestId } from './shared/infra/http/request-id';
+import { Logger as PinoLogger } from 'nestjs-pino';
 import { PostgresIoAdapter } from './shared/infra/ws/postgres-io.adapter';
 
 export function configureApp(app: INestApplication): INestApplication {
   app.setGlobalPrefix('api/v1');
+  app.use(requestId);   // primero: todo lo que siga puede nombrar el pedido
   app.use(helmet());
   app.enableCors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000', credentials: true });
   app.use(cookieParser());
@@ -35,6 +38,9 @@ export async function createApp(module?: Type<unknown>) {
 
 async function bootstrap() {
   const app = await createApp();
+  // Un solo logger para todo: los Logger de Nest salen por pino, con el mismo
+  // formato y el mismo id de pedido que el resto.
+  app.useLogger(app.get(PinoLogger));
 
   // Va acá y no en configureApp: los tests e2e montan la app sin base, y pedirles
   // un pool de Postgres para probar un controlador HTTP no tendria sentido.
