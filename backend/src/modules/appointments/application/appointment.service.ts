@@ -89,9 +89,7 @@ export class AppointmentService {
       throw new BadRequestException('El doctor no está disponible en esa fecha (bloqueo de agenda)');
     }
 
-    const lastCode = await this.appointments.findLastCode();
-    const nextNumber = lastCode ? parseInt(lastCode.slice(3), 10) + 1 : 1;
-    const code = `TM-${String(nextNumber).padStart(5, '0')}`;
+    const code = await this.appointments.nextCode();
 
     const appointment = new Appointment(
       randomUUID(), doctor.id, patient.id, doctor.specialtyId,

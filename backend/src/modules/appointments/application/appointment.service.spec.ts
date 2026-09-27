@@ -57,7 +57,7 @@ describe('Appointment (domain)', () => {
 
 describe('AppointmentService', () => {
   const now = new Date('2026-09-06T12:00:00Z');
-  const appointments: any = { findById: jest.fn(), findAll: jest.fn(), countByDayAndStatus: jest.fn(), findByDoctorAndDateTime: jest.fn(), findByPatientSpecialtyAndDateRange: jest.fn(), save: jest.fn(), update: jest.fn(), findLastCode: jest.fn() };
+  const appointments: any = { findById: jest.fn(), findAll: jest.fn(), countByDayAndStatus: jest.fn(), findByDoctorAndDateTime: jest.fn(), findByPatientSpecialtyAndDateRange: jest.fn(), save: jest.fn(), update: jest.fn(), nextCode: jest.fn() };
   const doctors: any = { findById: jest.fn(), findByUserId: jest.fn(), findByIds: jest.fn() };
   const availabilities: any = { findByDoctorAndDay: jest.fn() };
   const scheduleBlocks: any = { findOverlapping: jest.fn() };
@@ -74,7 +74,7 @@ describe('AppointmentService', () => {
     appointments.countByDayAndStatus.mockResolvedValue([]);
     appointments.findByDoctorAndDateTime.mockResolvedValue([]);
     appointments.findByPatientSpecialtyAndDateRange.mockResolvedValue([]);
-    appointments.findLastCode.mockResolvedValue(null);
+    appointments.nextCode.mockResolvedValue('TM-00001');
     doctors.findById.mockResolvedValue(undefined);
     doctors.findByUserId.mockResolvedValue(undefined);
     availabilities.findByDoctorAndDay.mockResolvedValue([]);

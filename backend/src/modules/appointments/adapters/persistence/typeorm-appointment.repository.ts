@@ -6,7 +6,25 @@ import { AppointmentStatus } from '../../domain/appointment-status.enum';
 import { AppointmentRepository, AppointmentFilters, DaySummaryRow } from '../../appointment.repository.port';
 import { APP_TIME_ZONE } from '../../../../shared/infra/time/format';
 import { Appointment } from '../../domain/appointment';
+import { TimeSlotUnavailableError } from '../../domain/exceptions';
 import { AppointmentOrmEntity } from './appointment.entity';
+
+/** Violación de unicidad en Postgres. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Reconoce el choque por horario, y sólo ese.
+ *
+ * Se mira el nombre del constraint y no el mensaje: el mensaje cambia con el
+ * idioma y la versión del servidor. Cualquier otra violación de unicidad —un id
+ * repetido, por ejemplo— es un problema distinto y tiene que seguir subiendo
+ * como está, sin disfrazarse de conflicto de agenda.
+ */
+function esHorarioTomado(error: unknown): boolean {
+  const driver = (error as { driverError?: { code?: string; constraint?: string } })?.driverError;
+  return driver?.code === UNIQUE_VIOLATION
+    && driver?.constraint === 'appointments_doctor_id_date_time_key';
+}
 
 @Injectable()
 export class TypeOrmAppointmentRepository implements AppointmentRepository {
@@ -83,12 +101,27 @@ export class TypeOrmAppointmentRepository implements AppointmentRepository {
     return entities.map(e => this.map(e));
   }
 
-  async findLastCode(): Promise<string | null> {
-    const e = await this.repo.findOne({ where: {}, order: { code: 'DESC' } });
-    return e?.code ?? null;
+  async nextCode(): Promise<string> {
+    // La secuencia es la unica forma de que dos pedidos simultaneos no se lleven
+    // el mismo numero. Calcularlo leyendo el maximo es una carrera perdida.
+    const [{ nextval }] = await this.repo.query(`SELECT nextval('appointment_code_seq')`) as [{ nextval: string }];
+    return `TM-${String(nextval).padStart(5, '0')}`;
   }
 
   async save(a: Appointment) {
+    try {
+      return await this.insert(a);
+    } catch (error) {
+      // El cinturon de seguridad. La validacion previa cubre el 99% de los casos
+      // con un mensaje mejor, pero entre validar y grabar hay una ventana: si
+      // otro entro primero, el constraint lo frena y eso tiene que llegar al
+      // usuario como "ese horario ya esta tomado", no como un error interno.
+      if (esHorarioTomado(error)) throw new TimeSlotUnavailableError();
+      throw error;
+    }
+  }
+
+  private async insert(a: Appointment) {
     const e = await this.repo.save(Object.assign(new AppointmentOrmEntity(), {
       id: a.id, code: a.code, doctorId: a.doctorId, patientId: a.patientId, specialtyId: a.specialtyId,
       dateTime: a.dateTime, durationMinutes: a.durationMinutes, status: a.status, notes: a.notes, cancellationReason: a.cancellationReason,
