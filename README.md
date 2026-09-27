@@ -1,6 +1,6 @@
 # Pulso — Gestión de turnos médicos
 
-[![CI](https://github.com/cristian-micchele-dev/TurnosMedicos/actions/workflows/ci.yml/badge.svg)](https://github.com/cristian-micchele-dev/TurnosMedicos/actions/workflows/ci.yml)
+[![CI](https://github.com/cristian-micchele-dev/Pulso/actions/workflows/ci.yml/badge.svg)](https://github.com/cristian-micchele-dev/Pulso/actions/workflows/ci.yml)
 
 Sistema interno (HIS) para que el personal de un hospital gestione médicos, pacientes, disponibilidad y turnos.
 Monorepo con API REST en **NestJS** (arquitectura hexagonal) y SPA en **React**.
