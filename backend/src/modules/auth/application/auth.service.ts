@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { DomainError, UnauthorizedError } from '../../../shared/domain/errors';
 import { CLOCK as CLOCK_TOKEN, Clock, HASHER, Hasher, TOKEN_SERVICE, TokenService } from '../../../shared/application/ports';
@@ -10,6 +10,7 @@ import { assertStrongPassword } from '../../users/domain/password-policy';
 import { isLocked, minutesLeft, registerFailure } from '../../users/domain/account-lockout';
 import { AuditService } from '../../audit/application/audit.service';
 import { AuditAction } from '../../audit/domain/audit-entry';
+import { MetricsService } from '../../../shared/infra/metrics/metrics.service';
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /**
@@ -27,7 +28,7 @@ export class AccountLockedError extends DomainError {
 
 @Injectable()
 export class AuthService {
-  constructor(@Inject('USER_REPOSITORY') private readonly users: UserRepository, @Inject(HASHER) private readonly hasher: Hasher, @Inject(TOKEN_SERVICE) private readonly tokens: TokenService, @Inject(SESSION_REPOSITORY) private readonly sessions: SessionRepository, @Inject(RESET_REPOSITORY) private readonly resets: ResetRepository, @Inject(MAILER) private readonly mailer: MailerPort, @Inject(CLOCK_TOKEN) private readonly clock: Clock, private readonly audit: AuditService) {}
+  constructor(@Inject('USER_REPOSITORY') private readonly users: UserRepository, @Inject(HASHER) private readonly hasher: Hasher, @Inject(TOKEN_SERVICE) private readonly tokens: TokenService, @Inject(SESSION_REPOSITORY) private readonly sessions: SessionRepository, @Inject(RESET_REPOSITORY) private readonly resets: ResetRepository, @Inject(MAILER) private readonly mailer: MailerPort, @Inject(CLOCK_TOKEN) private readonly clock: Clock, private readonly audit: AuditService, @Optional() private readonly metrics?: MetricsService) {}
   // A remembered session lives longer and the refresh JWT must expire together with it.
   private async issue(user: User, familyId: string = randomUUID(), persistent = false) {
     const jti = randomUUID();
@@ -58,7 +59,13 @@ export class AuthService {
     await this.users.setLoginFailures(user.id, attempts, lockedUntil);
     // Solo el bloqueo va a la auditoría: anotar cada fallo le daría al atacante
     // una forma barata de llenarle la tabla a la clínica.
-    if (lockedUntil) await this.audit.record(null, AuditAction.ACCOUNT_LOCKED, 'user', user.id, { attempts, minutes: minutesLeft(lockedUntil, now) });
+    this.metrics?.recordEvent('login_failed');
+    if (lockedUntil) {
+      // Un bloqueo no devuelve error de sistema: sin esta metrica, una oleada de
+      // intentos contra muchas cuentas no se ve en ningun grafico.
+      this.metrics?.recordEvent('account_locked');
+      await this.audit.record(null, AuditAction.ACCOUNT_LOCKED, 'user', user.id, { attempts, minutes: minutesLeft(lockedUntil, now) });
+    }
   }
   async refresh(raw: string) { try { if (!raw) throw new UnauthorizedError(); const payload = this.tokens.verifyRefresh(raw); const session = await this.sessions.findByJti(String(payload.jti)); if (!session || session.familyId !== String(payload.familyId) || session.revokedAt || session.expiresAt <= this.clock.now() || session.tokenHash !== sha(raw)) { if (session) await this.sessions.revokeFamily(session.familyId); throw new UnauthorizedError(); } const user = await this.users.findById(session.userId); if (!user?.active) throw new UnauthorizedError(); const replacement = await this.issue(user, session.familyId, Boolean(session.persistent)); const replacementPayload = this.tokens.verifyRefresh(replacement.refreshToken); if (!await this.sessions.rotate(session.id, sha(raw), String(replacementPayload.jti), this.clock.now())) { await this.sessions.revokeFamily(session.familyId); throw new UnauthorizedError(); } return replacement; } catch (error) { if (error instanceof UnauthorizedError) throw error; throw new UnauthorizedError(); } }
   async logout(raw?: string) { if (!raw) return; try { const payload = this.tokens.verifyRefresh(raw); const session = await this.sessions.findByJti(String(payload.jti)); if (session && !session.revokedAt) await this.sessions.revoke(session.id); } catch { /* idempotente */ } }

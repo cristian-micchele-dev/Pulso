@@ -1,0 +1,91 @@
+# Reglas de alerta para Prometheus / Grafana Alerting.
+#
+# Esto no corre solo: hay que cargarlo en un Prometheus o en Grafana, y ahí
+# configurar a dónde avisa (mail, Slack, Telegram). Las métricas que usa ya las
+# expone la app en GET /api/v1/metrics, protegido con METRICS_TOKEN.
+#
+# Configuración del scrape, del lado de Prometheus:
+#
+#   scrape_configs:
+#     - job_name: pulso
+#       metrics_path: /api/v1/metrics
+#       authorization: { type: Bearer, credentials: "<METRICS_TOKEN>" }
+#       static_configs: [{ targets: ["pulso-api:3000"] }]
+#
+# Criterio para lo que sigue: cada alerta tiene que poder despertar a alguien a
+# las 3 de la mañana y que esa persona pueda HACER algo. Una alerta que no se
+# acciona se termina silenciando, y el día que importe va a estar silenciada.
+
+groups:
+  - name: pulso-disponibilidad
+    rules:
+      - alert: ApiCaida
+        expr: up{job="pulso"} == 0
+        for: 2m
+        labels: { severity: critica }
+        annotations:
+          summary: "La API no responde hace 2 minutos"
+          description: "Nadie puede sacar ni consultar un turno. Revisar el proceso y la conexión a la base."
+
+      - alert: MuchosErroresDeServidor
+        # Más del 5% de los pedidos fallando por culpa nuestra (5xx), sostenido.
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels: { severity: critica }
+        annotations:
+          summary: "Más del 5% de los pedidos termina en error de servidor"
+          description: "Buscar en los logs por x-request-id los pedidos con statusCode 5xx de los últimos 5 minutos."
+
+      - alert: RespuestaLenta
+        # El percentil 95: al 5% de la gente le tarda más de 2 segundos.
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route)) > 2
+        for: 10m
+        labels: { severity: aviso }
+        annotations:
+          summary: "La ruta {{ $labels.route }} tarda más de 2s para el 5% de los pedidos"
+          description: "Suele ser una consulta sin índice o el pool de conexiones al límite."
+
+  - name: pulso-seguridad
+    rules:
+      - alert: OleadaDeBloqueos
+        # Un bloqueo suelto es alguien que olvidó la clave. Diez en cinco minutos
+        # es alguien probando contraseñas contra muchas cuentas, y NO genera ni un
+        # solo error de servidor: sin esta alerta, no se ve en ningún lado.
+        expr: increase(pulso_events_total{event="account_locked"}[5m]) > 10
+        for: 0m
+        labels: { severity: critica }
+        annotations:
+          summary: "{{ $value }} cuentas bloqueadas en 5 minutos"
+          description: "Probable ataque de fuerza bruta distribuido. Revisar /auditoria filtrando por ACCOUNT_LOCKED."
+
+      - alert: PicoDeLoginsFallidos
+        expr: rate(pulso_events_total{event="login_failed"}[5m]) > 1
+        for: 10m
+        labels: { severity: aviso }
+        annotations:
+          summary: "Más de un login fallido por segundo, sostenido"
+          description: "Puede ser un ataque o algo roto en la pantalla de login. Mirar si se concentran en una sola cuenta."
+
+  - name: pulso-proceso
+    rules:
+      - alert: EventLoopTrabado
+        # Node es de un solo hilo: si el event loop se atrasa, TODO se atrasa,
+        # aunque la memoria y la CPU se vean bien.
+        expr: nodejs_eventloop_lag_seconds > 0.2
+        for: 5m
+        labels: { severity: aviso }
+        annotations:
+          summary: "El event loop está atrasado {{ $value }}s"
+          description: "Algo sincrónico y pesado está bloqueando el proceso: generación de PDF, un JSON enorme, un bucle."
+
+      - alert: MemoriaEnSubidaSostenida
+        expr: increase(process_resident_memory_bytes[1h]) > 200 * 1024 * 1024
+        for: 15m
+        labels: { severity: aviso }
+        annotations:
+          summary: "La memoria subió más de 200MB en una hora"
+          description: "Huele a pérdida de memoria. Comparar contra el tráfico antes de reiniciar: si el tráfico no subió, es fuga."

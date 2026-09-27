@@ -6,6 +6,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 import { loggingConfig } from './shared/infra/logging/logging.config';
+import { MetricsModule } from './shared/infra/metrics/metrics.module';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.schema';
 import { HealthController } from './shared/infra/http/health.controller';
@@ -49,6 +50,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
       }),
     }),
     LoggerModule.forRoot(loggingConfig()),
+    MetricsModule,
     SharedModule,
     AuthModule,
     UsersModule,
