@@ -9,6 +9,29 @@ Monorepo con API REST en **NestJS** (arquitectura hexagonal) y SPA en **React**.
 
 ![Dashboard de Pulso](docs/img/dashboard.png)
 
+<details>
+<summary><b>Más pantallas</b> — cada una muestra una decisión, no una feature</summary>
+
+<br>
+
+**Mi Agenda.** Los turnos se acumulan para siempre: la historia clínica se guarda 10 años y de cada turno cuelgan informes, recetas y auditoría. Por eso no se borran — se deja de mostrarlos. El selector **Próximos · Historial · Todos** recorta, y la búsqueda la resuelve la base, no el navegador.
+
+![Listado de turnos](docs/img/agenda.png)
+
+**Mensajes.** Chat interno del personal. Cada código `TM-` que alguien escribe se vuelve un enlace al turno, para cerrar la distancia entre la conversación y la reserva de la que habla. El aviso de arriba no es decorativo: las notas clínicas viven en el turno, no acá.
+
+![Chat interno](docs/img/mensajes.png)
+
+**Calendario.** Los puntos de cada día salen de una consulta que agrupa por día y estado en el huso del hospital, no de traerse los turnos y contarlos en el navegador.
+
+![Calendario mensual](docs/img/calendario.png)
+
+**Login.** Fondo de red neuronal en canvas, sólo en modo oscuro.
+
+![Pantalla de acceso](docs/img/login.png)
+
+</details>
+
 ---
 
 ## Decisiones de dominio
