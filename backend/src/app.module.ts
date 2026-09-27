@@ -39,7 +39,14 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration], validate: validateEnv }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 100 }]),
+    // Configurable porque el limite correcto depende del despliegue: detras de un
+    // balanceador todo el trafico llega de una sola IP, y en una prueba de carga
+    // el limitador taparia justo lo que se quiere medir.
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [{ name: 'default', ...config.getOrThrow('throttle') }],
+    }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -47,6 +54,10 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
         url: config.getOrThrow('databaseUrl'),
         entities: [UserOrmEntity, AuthSessionOrmEntity, ResetTokenOrmEntity, SpecialtyOrmEntity, DoctorOrmEntity, AvailabilityOrmEntity, ScheduleBlockOrmEntity, PatientOrmEntity, AuditLogOrmEntity, NotificationOrmEntity, MessageOrmEntity, AppointmentOrmEntity, AppointmentCommentOrmEntity, MedicalReportOrmEntity, PrescriptionOrmEntity],
         synchronize: false,
+        // Cada instancia se lleva hasta DB_POOL_MAX conexiones, y el servidor tiene
+        // un max_connections finito: N instancias por el pool no puede superarlo.
+        // Con el default de 10 y los 60 de Supabase, el techo son ~4 instancias.
+        extra: { max: config.getOrThrow<number>('dbPoolMax') },
       }),
     }),
     LoggerModule.forRoot(loggingConfig()),
