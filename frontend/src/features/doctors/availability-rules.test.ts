@@ -60,10 +60,11 @@ describe('validateSlot — cuándo atiende un médico', () => {
 });
 
 describe('validateBlock — cuándo NO atiende', () => {
+  // El formulario pide fecha Y hora: son instantes, no dias sueltos.
   const bloque = (startDate: string, endDate: string) => ({ startDate, endDate, reason: '' });
 
-  it('un bloqueo con fechas coherentes no tiene errores', () => {
-    expect(validateBlock(bloque('2027-01-10', '2027-01-20'))).toEqual({});
+  it('un bloqueo con instantes coherentes no tiene errores', () => {
+    expect(validateBlock(bloque('2027-01-10T09:00', '2027-01-20T18:00'))).toEqual({});
   });
 
   it('pide las dos fechas', () => {
@@ -73,10 +74,14 @@ describe('validateBlock — cuándo NO atiende', () => {
   });
 
   it('el fin no puede ser anterior al inicio', () => {
-    expect(validateBlock(bloque('2027-01-20', '2027-01-10')).endDate).toBeTruthy();
+    expect(validateBlock(bloque('2027-01-20T09:00', '2027-01-10T09:00')).endDate).toBeTruthy();
   });
 
-  it('un bloqueo de un solo día es válido: alguien se toma UN día', () => {
-    expect(validateBlock(bloque('2027-01-10', '2027-01-10'))).toEqual({});
+  it('bloquear una sola tarde es válido: no hace falta que sean días distintos', () => {
+    expect(validateBlock(bloque('2027-01-10T14:00', '2027-01-10T20:00'))).toEqual({});
+  });
+
+  it('empezar y terminar en el mismo instante no bloquea nada', () => {
+    expect(validateBlock(bloque('2027-01-10T14:00', '2027-01-10T14:00')).endDate).toBeTruthy();
   });
 });

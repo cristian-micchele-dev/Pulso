@@ -93,9 +93,10 @@ export function validateBlock(draft: BlockDraft): BlockErrors {
   if (!draft.startDate) errors.startDate = 'Ingresá la fecha de inicio';
   if (!draft.endDate) errors.endDate = 'Ingresá la fecha de fin';
 
-  // Un solo día es un rango válido: alguien se toma UN día.
-  if (draft.startDate && draft.endDate && draft.endDate < draft.startDate) {
-    errors.endDate = 'La fecha de fin no puede ser anterior al inicio';
+  // Son instantes, no días: el formulario pide fecha Y hora. Un bloqueo que
+  // empieza y termina en el mismo momento no bloquea nada.
+  if (draft.startDate && draft.endDate && draft.endDate <= draft.startDate) {
+    errors.endDate = 'La fecha de fin debe ser posterior al inicio';
   }
 
   return errors;

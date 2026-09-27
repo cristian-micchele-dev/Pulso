@@ -9,7 +9,6 @@ import { Input } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import styles from './AvailabilityPage.module.css';
 import { apiErrorMessage } from '../../api/client';
-import { endOfLocalDay, startOfLocalDay } from '../../utils/date';
 import { validateBlock, validateSlot, type BlockErrors, type SlotErrors } from './availability-rules';
 
 const DAY_NAMES: Record<number, string> = {
@@ -228,10 +227,11 @@ export function AvailabilityPage() {
     try {
       setSavingBlock(true);
       const dto: CreateScheduleBlockDto = {
-        // Dias COMPLETOS: quien escribe 'del 18 al 20' incluye los dos. Mandar
-        // la medianoche dejaba el ultimo dia entero sin bloquear.
-        startDate: startOfLocalDay(blockForm.startDate),
-        endDate: endOfLocalDay(blockForm.endDate),
+        // El formulario pide fecha Y hora (datetime-local), asi que el valor ya
+        // viene como instante local: 'new Date' lo interpreta en la zona del
+        // navegador, que es la del hospital. No hay que redondear a dia completo.
+        startDate: new Date(blockForm.startDate).toISOString(),
+        endDate: new Date(blockForm.endDate).toISOString(),
         ...(blockForm.reason.trim() ? { reason: blockForm.reason.trim() } : {}),
       };
       const saved = await doctorsApi.addBlock(resolvedDoctorId, dto);
