@@ -14,7 +14,8 @@
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./test/jest-integration.json --runInBand",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
-    "seed:admin": "ts-node -T -O \"{\\\"rootDir\\\":\\\".\\\"}\" src/database/seed-admin.ts"
+    "seed:admin": "ts-node -T -O \"{\\\"rootDir\\\":\\\".\\\"}\" src/database/seed-admin.ts",
+    "seed:demo": "ts-node -T -O \"{\\\"rootDir\\\":\\\".\\\"}\" src/database/seed-demo.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.0",

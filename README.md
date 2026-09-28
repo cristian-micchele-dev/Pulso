@@ -140,6 +140,22 @@ ADMIN_EMAIL=admin@hospital.com ADMIN_PASSWORD='una-clave-larga' ADMIN_NAME='Admi
 
 Desde ahí, todo (médicos, pacientes, otros admins) se gestiona por el panel.
 
+### Clínica de muestra
+
+Para ver el sistema con contenido —y para las capturas de este README— hay un seed
+de demo con tres médicos, doce pacientes y turnos repartidos entre pasados,
+próximos y cancelados:
+
+```bash
+cd backend
+npm run seed:demo
+```
+
+Es idempotente: correrlo dos veces no duplica nada. Los nombres son inventados a
+propósito — en un sistema cuya tesis es el cuidado de la historia clínica,
+mostrar datos que parecen reales sería incoherente. Imprime los usuarios y la
+contraseña para entrar.
+
 **Contraseñas olvidadas** — no hay email saliente, así que el ADMIN resetea desde Usuarios → "Resetear clave": el sistema genera una clave temporal (se muestra una sola vez), cierra las sesiones del usuario y lo obliga a elegir una contraseña propia en el próximo ingreso.
 
 ### Variables de entorno (backend)
