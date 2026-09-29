@@ -42,7 +42,7 @@ const DENSIDAD_SINAPSIS = 0.14;
  * unos 96° sobre los 360° del cilindro), así que bajarlo abre huecos y subirlo
  * cuesta geometría: cada una aporta entre 50 y 200 tubos.
  */
-const NEURONAS = 28;
+export const NEURONAS = 28;
 
 /**
  * El tejido se siembra en un CILINDRO alrededor del eje Y, no en una lista de
@@ -54,9 +54,9 @@ const NEURONAS = 28;
  * puñado de neuronas que entra en cuadro es siempre igual de denso.
  */
 const RADIO_INTERNO = 0.5;
-const RADIO_EXTERNO = 2.9;
+export const RADIO_EXTERNO = 2.9;
 /** Media altura del cilindro: cubre arriba y abajo del encuadre. */
-const ALTURA = 1.9;
+export const ALTURA = 1.9;
 
 /**
  * Dónde está la cámara y cuánto espacio hay que dejarle libre.
@@ -65,8 +65,8 @@ const ALTURA = 1.9;
  * gigantes y desenfocados. Se descartan las posiciones más cercanas que esto.
  * Tiene que seguir a `ZOOM_BASE` de `NeuralTissue`.
  */
-const CAMARA_Z = 0.3;
-const DESPEJE = 1.15;
+export const CAMARA_Z = 0.3;
+export const DESPEJE = 1.15;
 
 /** Una neurona ya ubicada, con el detalle que le toca según lo lejos que esté. */
 interface Ubicacion {
