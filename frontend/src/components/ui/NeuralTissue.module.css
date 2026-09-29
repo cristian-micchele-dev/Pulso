@@ -1,0 +1,20 @@
+/**
+ * A diferencia del resto de los fondos, este SI recibe el puntero: se puede
+ * agarrar para girarlo, rodar para acercarse y clickear para disparar un
+ * chispazo. La tarjeta de login va por encima (z-index 1), asi que los clics
+ * sobre el formulario nunca llegan hasta aca.
+ */
+.fondo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  cursor: grab;
+  /* Sin esto, en un telefono el arrastre desplaza la pagina en vez de girar. */
+  touch-action: none;
+}
+
+.fondo:active {
+  cursor: grabbing;
+}

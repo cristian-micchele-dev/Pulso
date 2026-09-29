@@ -1,11 +1,21 @@
-import { useState, type FormEvent } from 'react';
+import { lazy, Suspense, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { NeuralBackground } from '../../components/ui/NeuralBackground';
 import { apiErrorMessage } from '../../api/client';
 import styles from './LoginPage.module.css';
+
+/**
+ * El fondo 3D se carga aparte del formulario.
+ *
+ * Arrastra three.js, casi un megabyte, y ésta es la primera pantalla que abre
+ * cualquiera: metido en este chunk, el formulario esperaría a que baje una
+ * decoración para poder usarse. Así entra cuando llega, sin frenar a nadie.
+ */
+const NeuralTissue = lazy(() =>
+  import('../../components/ui/NeuralTissue').then((m) => ({ default: m.NeuralTissue })),
+);
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -36,7 +46,14 @@ export function LoginPage() {
 
   return (
     <div className={styles.page}>
-      <NeuralBackground />
+      {/*
+        Sin `fallback`: mientras el tejido no está, se ve la gradiente que ya
+        pinta `.page`. Un spinner acá sería peor que nada, porque anunciaría que
+        falta algo que el usuario no vino a buscar.
+      */}
+      <Suspense fallback={null}>
+        <NeuralTissue />
+      </Suspense>
       <div className={styles.card} role="main">
         <div className={styles.brand}>
           <div className={styles.logo} aria-hidden="true">

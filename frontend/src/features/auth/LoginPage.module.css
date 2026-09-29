@@ -15,6 +15,14 @@
   background-color: var(--bg);
 
   /*
+   * The colour the 3D tissue fades into with distance. It has to match what is
+   * actually painted behind the canvas, so it lives here next to the gradient
+   * that paints it — if it were hard-coded in the component, changing the
+   * backdrop would silently leave the far neurons dissolving into the old hue.
+   */
+  --tissue-fog: #eef2f7;
+
+  /*
    * The card used to float in an empty field. Now the page is composed: light
    * pools where the card sits, the brand blue washes in from the top-left and a
    * breath of teal closes the bottom-right. Still paper, never white.
@@ -25,13 +33,26 @@
     radial-gradient(ellipse 72% 58% at 104% 108%, rgba(45, 212, 191, 0.12) 0%, transparent 62%);
 }
 
-/* Dark theme: the deep-blue field of a micrograph, brighter where the light comes in. */
+/*
+ * Dark theme: the black field of a fluorescence micrograph.
+ *
+ * It is nearly black on purpose. Only what is lit is visible down a scope, and
+ * that darkness is what lets the cool and warm neurons read as EMITTING light
+ * rather than being painted on top of something. A tinted backdrop would flatten
+ * them, however pretty the tint.
+ *
+ * The two washes are faint: a cold haze top-left and a warm one bottom-right,
+ * just enough to keep the corners from going dead flat.
+ */
 :global([data-theme='dark']) .page,
 :global(:root:not([data-theme='light'])) .page {
+  /* Where depth dies out. It tracks the darkest stop below, not the washes. */
+  --tissue-fog: #04070f;
+
   background-image:
-    radial-gradient(ellipse 80% 70% at 20% 10%, rgba(37, 99, 235, 0.45) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 60% at 85% 90%, rgba(14, 116, 200, 0.35) 0%, transparent 60%),
-    linear-gradient(160deg, #0a1f4d 0%, #0b1120 55%, #061a3a 100%);
+    radial-gradient(ellipse 80% 70% at 22% 12%, rgba(40, 96, 168, 0.30) 0%, transparent 62%),
+    radial-gradient(ellipse 70% 60% at 86% 92%, rgba(150, 68, 40, 0.20) 0%, transparent 62%),
+    linear-gradient(160deg, #060b16 0%, #02040a 55%, #080a14 100%);
 }
 
 /* ---------- Card ---------- */
@@ -53,6 +74,47 @@
   box-shadow: var(--shadow-xl);
 
   animation: cardFadeUp var(--transition-slow) both;
+}
+
+/*
+ * Dark theme only: the card becomes glass over the living tissue behind it.
+ *
+ * The work is done by the BLUR, not by the transparency. This is a credentials
+ * form sitting on an animated scene with bright cyan and amber highlights, so
+ * text contrast is the thing at risk: the lower the alpha, the more it swings
+ * frame by frame.
+ *
+ * The two values move together. At 75% the blur has to go up, not stay put,
+ * because it is the blur that collapses whatever is behind into soft stable
+ * colour. Dropping the alpha further without raising it is where the labels
+ * start to fight the tissue — if that is ever needed, raise the blur first and
+ * only then reconsider the alpha.
+ *
+ * `--slate` is #151e32, so the colour below is that same slate — only the alpha
+ * changes. The hairline border is what catches the light passing through and
+ * makes it read as glass instead of translucent plastic.
+ *
+ * Cost worth knowing: `backdrop-filter` over an animating canvas is recomputed
+ * every frame, and on a weak machine that shows.
+ */
+:global([data-theme='dark']) .card,
+:global(:root:not([data-theme='light'])) .card {
+  background: rgba(21, 30, 50, 0.75);
+  backdrop-filter: blur(32px) saturate(130%);
+  -webkit-backdrop-filter: blur(32px) saturate(130%);
+  border-color: rgba(255, 255, 255, 0.11);
+}
+
+/*
+ * No backdrop-filter, no transparency. Without the blur, the moving tissue shows
+ * straight through the card and the labels become unreadable — a translucent
+ * card is worse than an opaque one, never a graceful degradation.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :global([data-theme='dark']) .card,
+  :global(:root:not([data-theme='light'])) .card {
+    background: var(--slate);
+  }
 }
 
 @keyframes cardFadeUp {
