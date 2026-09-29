@@ -55,8 +55,14 @@ beforeEach(() => {
 describe('MessagesPage', () => {
   it('lista las conversaciones con su no leídos', async () => {
     renderPage();
-    expect(await screen.findByText('Laura Gómez')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+
+    // El globito se busca DENTRO de la fila de Laura y no en todo el documento.
+    // `getByText('2')` a secas fue inestable: busca un caracter suelto en toda la
+    // pantalla, asi que cualquier otro elemento que muestre un "2" lo rompe por
+    // ambiguedad. Acotado a la fila, la asercion dice lo que de verdad importa —
+    // que ESA conversacion tiene dos sin leer— y no depende del resto.
+    const fila = await screen.findByRole('button', { name: /laura gómez/i });
+    expect(within(fila).getByText('2')).toBeInTheDocument();
   });
 
   it('al abrir una conversación muestra el hilo y distingue lo mío de lo suyo', async () => {
