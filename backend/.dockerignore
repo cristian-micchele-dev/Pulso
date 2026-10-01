@@ -1,0 +1,16 @@
+# Lo que NO viaja al servidor de build.
+#
+# El contexto se sube entero antes de ejecutar la primera instruccion del
+# Dockerfile. Sin esta lista se mandan node_modules y dist, que son cientos de
+# megas, en cada despliegue: el build tarda muchisimo mas y se sube basura que
+# igual se descarta.
+#
+# dist ademas es peligroso: si se colara una compilacion hecha en otra maquina,
+# podria tapar la que genera la imagen.
+node_modules
+dist
+coverage
+.env
+.env.*
+*.log
+.git
