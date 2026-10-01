@@ -129,4 +129,27 @@ describe('crearAlmacen', () => {
   it('falla con un driver que no existe en vez de adivinar', () => {
     expect(() => crearAlmacen({ STORAGE_DRIVER: 's3' })).toThrow(/desconocido/);
   });
+
+  it('rechaza la URL del API REST, que es la que muestra el panel', () => {
+    // Supabase muestra https://<proyecto>.supabase.co/rest/v1/ y es la que uno
+    // copia. Pasada tal cual, el adaptador armaria /rest/v1/storage/v1/... y la
+    // API responderia 404 sin decir por que.
+    expect(() =>
+      crearAlmacen({
+        STORAGE_DRIVER: 'supabase',
+        SUPABASE_URL: 'https://proyecto.supabase.co/rest/v1/',
+        SUPABASE_SERVICE_KEY: 'clave',
+      }),
+    ).toThrow(/sin ninguna ruta/);
+  });
+
+  it('tolera la barra final, que es un descuido inofensivo', () => {
+    expect(
+      crearAlmacen({
+        STORAGE_DRIVER: 'supabase',
+        SUPABASE_URL: 'https://proyecto.supabase.co/',
+        SUPABASE_SERVICE_KEY: 'clave',
+      }),
+    ).toBeInstanceOf(AlmacenSupabase);
+  });
 });

@@ -29,7 +29,19 @@ export function crearAlmacen(env: NodeJS.ProcessEnv = process.env): AlmacenDeArc
           'Sin eso los archivos se guardarian en un disco efimero y se perderian.',
       );
     }
-    return new AlmacenSupabase(url.replace(/\/+$/, ''), clave, bucket);
+    // El panel de Supabase muestra la URL del API REST, con /rest/v1 pegado al
+    // final, y es la que casi todo el mundo copia. Pasada tal cual, el adaptador
+    // armaria /rest/v1/storage/v1/object/... y la API responderia 404 sin decir
+    // por que. Vale mas no arrancar que perseguir ese 404 en produccion.
+    const limpia = url.replace(/\/+$/, '');
+    if (new URL(limpia).pathname !== '/') {
+      throw new Error(
+        `SUPABASE_URL tiene que ser solo el dominio del proyecto, sin ninguna ruta. ` +
+          `Recibi "${limpia}"; se esperaba algo como https://<proyecto>.supabase.co`,
+      );
+    }
+
+    return new AlmacenSupabase(limpia, clave, bucket);
   }
 
   if (driver !== 'disk') {
