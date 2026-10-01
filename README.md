@@ -7,6 +7,26 @@ Monorepo con API REST en **NestJS** (arquitectura hexagonal) y SPA en **React**.
 
 > Proyecto de portfolio. El foco está en decisiones de dominio explícitas, arquitectura limpia y reglas de negocio testeadas — no en la cantidad de features.
 
+## Probarlo
+
+**https://pulso-six-mauve.vercel.app**
+
+Entrá con cualquiera de estas cuentas. La contraseña es la misma para todas: **`demo pulso 2026`**
+
+| Cuenta | Rol | Qué se ve desde ahí |
+|---|---|---|
+| `marta.recepcion@demo.pulso` | Secretaría | Alta de pacientes, reserva y reprogramación de turnos |
+| `valeria.sosa@demo.pulso` | Médica — Cardiología | Agenda propia, disponibilidad, informes y recetas |
+| `ramiro.alcorta@demo.pulso` | Médico — Traumatología | Lo mismo, con otra especialidad y otros horarios |
+| `ingrid.vallejos@demo.pulso` | Médica — Dermatología | Ídem |
+
+Los datos son ficticios y están generados por `npm run seed:demo`. Se puede crear,
+cancelar y reprogramar sin romper nada.
+
+> **La primera carga puede tardar hasta un minuto.** La API corre en el plan
+> gratuito de Render, que apaga el servicio a los 15 minutos sin tráfico; la
+> primera visita lo despierta. No está roto, está arrancando.
+
 ![Dashboard de Pulso](docs/img/dashboard.png)
 
 <details>
@@ -26,7 +46,7 @@ Monorepo con API REST en **NestJS** (arquitectura hexagonal) y SPA en **React**.
 
 ![Calendario mensual](docs/img/calendario.png)
 
-**Login.** Fondo de red neuronal en canvas, sólo en modo oscuro.
+**Login.** El tejido neuronal del fondo está **generado por código**, no es un video ni un modelo descargado: las dendritas se ramifican de forma recursiva y se tubulan con radio decreciente, y cada soma se deforma hacia sus propios troncos. La matemática vive aparte de three.js y está testeada. Se carga con `lazy` para que el formulario no espere al motor 3D.
 
 ![Pantalla de acceso](docs/img/login.png)
 
