@@ -19,7 +19,19 @@ con un valor provisorio y corrigiéndolo al final.
    |---|---|
    | `DATABASE_URL` | Supabase → Connect → **Session pooler** (ver abajo) |
    | `CORS_ORIGIN` | el dominio que te asignó Vercel, sin barra final |
+   | `SUPABASE_URL` | Supabase → Settings → API → **Project URL** |
+   | `SUPABASE_SERVICE_KEY` | Supabase → Settings → API → clave **`service_role`** |
    | `METRICS_TOKEN` | opcional; sin valor, `/api/v1/metrics` queda abierto |
+
+   > **Antes hay que crear el bucket:** Supabase → Storage → New bucket, nombre
+   > `pulso`, con **"Public bucket" apagado**. Si quedara público, cualquiera con
+   > la URL del objeto leería informes médicos sin pasar por la API: sin login,
+   > sin rol y sin auditoría.
+   >
+   > La clave `service_role` **saltea todas las reglas de acceso** de Supabase.
+   > Eso es deliberado —quién ve cada informe lo decide el dominio, no una regla
+   > duplicada en la base— pero implica que no puede filtrarse: va sólo acá,
+   > nunca en el frontend ni en el repositorio.
 
    > **Tiene que ser el pooler en modo SESIÓN, no en modo transacción.**
    >

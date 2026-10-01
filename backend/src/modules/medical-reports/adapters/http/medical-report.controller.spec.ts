@@ -8,7 +8,10 @@ describe('MedicalReportController', () => {
     uploadForPatient: jest.fn().mockResolvedValue({ id: 'r1' }),
     findByAppointment: jest.fn().mockResolvedValue([]),
     findOne: jest.fn().mockResolvedValue({ id: 'r1', mimeType: 'application/pdf', originalName: 'x.pdf' }),
-    getFilePath: jest.fn().mockResolvedValue('/tmp/x.pdf'),
+    readFile: jest.fn().mockResolvedValue({
+      contenido: Buffer.from('%PDF'),
+      report: { id: 'r1', mimeType: 'application/pdf', originalName: 'x.pdf' },
+    }),
     findByPatient: jest.fn().mockResolvedValue({ data: [], total: 0 }),
     delete: jest.fn().mockResolvedValue(undefined),
   };
@@ -35,11 +38,13 @@ describe('MedicalReportController', () => {
     expect(service.findByPatient).toHaveBeenCalledWith('p1', 1, 10, actor);
   });
 
-  it('download autoriza antes de abrir el archivo', async () => {
+  it('download pide el archivo con el actor, que es quien decide el permiso', async () => {
     const res = { set: jest.fn() } as any;
     await controller.download('r1', req, res);
-    expect(service.findOne).toHaveBeenCalledWith('r1', actor);
-    expect(service.getFilePath).toHaveBeenCalledWith('r1', actor);
+    // Una sola llamada y no dos: antes autorizaba en findOne y otra vez en
+    // getFilePath. El permiso lo verifica readFile, antes de leer nada.
+    expect(service.readFile).toHaveBeenCalledWith('r1', actor);
+    expect(service.findOne).not.toHaveBeenCalled();
     expect(res.set).toHaveBeenCalledWith(expect.objectContaining({ 'Content-Type': 'application/pdf' }));
   });
 

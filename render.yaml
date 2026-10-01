@@ -64,6 +64,23 @@ services:
       - key: LOG_LEVEL
         value: info
 
+      # Los archivos NO pueden ir al disco: el de Render es efimero y se borra
+      # en cada despliegue y en cada reinicio. Con el plan gratuito, que apaga
+      # el servicio a los 15 minutos, un informe subido desaparecia al rato
+      # mientras su fila en la base seguia apuntandolo.
+      #
+      # Si falta alguna de las dos variables de abajo, la aplicacion NO ARRANCA.
+      # Es a proposito: caer al disco en silencio dejaria el servicio aceptando
+      # informes para perderlos, que es el bug que esto vino a resolver.
+      - key: STORAGE_DRIVER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      # La clave service_role, que saltea las reglas de acceso de Supabase.
+      # Vive solo aca: nunca en el frontend, nunca en el repositorio.
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+
       # Opcional: protege /api/v1/metrics. Sin valor, el endpoint queda abierto.
       - key: METRICS_TOKEN
         sync: false

@@ -22,7 +22,9 @@ describe('MedicalReportService', () => {
   const patients: any = { findById: jest.fn().mockResolvedValue({ id: 'p1', userId: 'user-p1' }) };
   const doctors: any = { findByUserId: jest.fn().mockResolvedValue(doctor) };
   const access: any = { assertCanRead: jest.fn().mockResolvedValue(undefined) };
-  const service = new MedicalReportService(reports, appointments, patients, doctors, access);
+  // Doble del puerto de archivos: el servicio ya no toca el disco.
+  const archivos: any = { guardar: jest.fn(), leer: jest.fn().mockResolvedValue(Buffer.from('pdf')), borrar: jest.fn() };
+  const service = new MedicalReportService(reports, appointments, patients, doctors, access, archivos);
   const actor = { sub: 'u-x', role: Role.DOCTOR };
 
   beforeEach(() => jest.clearAllMocks());
@@ -77,10 +79,10 @@ describe('MedicalReportService', () => {
   describe('lecturas pasan por la política de acceso a historia clínica', () => {
     const report = new MedicalReport('r1', 'a1', 'doc-1', 'p1', 'Informe', null, 'f.pdf', 'informe.pdf', 'application/pdf', 10);
 
-    it('findOne y getFilePath consultan la política con el paciente del informe', async () => {
+    it('findOne y readFile consultan la política con el paciente del informe', async () => {
       reports.findById.mockResolvedValue(report);
       await service.findOne('r1', actor);
-      await service.getFilePath('r1', actor);
+      await service.readFile('r1', actor);
       expect(access.assertCanRead).toHaveBeenCalledTimes(2);
       expect(access.assertCanRead).toHaveBeenCalledWith(actor, 'p1');
     });

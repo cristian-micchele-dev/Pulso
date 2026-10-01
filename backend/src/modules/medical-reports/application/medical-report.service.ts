@@ -1,8 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { join } from 'path';
-import { mkdirSync, unlinkSync } from 'fs';
-import { writeFile } from 'fs/promises';
 import { MedicalReportRepository, MEDICAL_REPORT_REPOSITORY } from '../medical-report.repository.port';
 import { AppointmentRepository, APPOINTMENT_REPOSITORY } from '../../appointments/appointment.repository.port';
 import { MedicalReport } from '../domain/medical-report';
@@ -21,8 +18,7 @@ import { MedicalRecordAccessPolicy } from '../../appointments/application/medica
 import { Actor } from '../../users/domain/actor';
 import { Role } from '../../users/domain/user';
 import { EXTENSION_BY_TYPE, sniffFileType, type SniffedType } from '../../../shared/infra/files/sniff';
-
-const UPLOADS_DIR = join(process.cwd(), 'uploads', 'reports');
+import { ALMACEN_DE_ARCHIVOS, AlmacenDeArchivos, CARPETA_INFORMES } from '../../../shared/application/file-storage.port';
 
 const ALLOWED_UPLOADS: SniffedType[] = ['application/pdf', 'image/jpeg', 'image/png'];
 
@@ -47,9 +43,8 @@ export class MedicalReportService {
     @Inject(PATIENT_REPOSITORY) private readonly patients: PatientRepository,
     @Inject(DOCTOR_REPOSITORY) private readonly doctors: DoctorRepository,
     private readonly access: MedicalRecordAccessPolicy,
-  ) {
-    mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
+    @Inject(ALMACEN_DE_ARCHIVOS) private readonly archivos: AlmacenDeArchivos,
+  ) {}
 
   // The JWT carries the user id; ownership is checked against the doctor profile id.
   private async resolveDoctorId(userId: string): Promise<string> {
@@ -74,8 +69,7 @@ export class MedicalReportService {
 
     const type = assertAllowedUpload(file);
     const fileName = `${randomUUID()}.${EXTENSION_BY_TYPE[type]}`;
-    const filePath = join(UPLOADS_DIR, fileName);
-    await writeFile(filePath, file.buffer);
+    await this.archivos.guardar(CARPETA_INFORMES, fileName, file.buffer, type);
 
     const report = new MedicalReport(
       randomUUID(),
@@ -109,8 +103,7 @@ export class MedicalReportService {
 
     const type = assertAllowedUpload(file);
     const fileName = `${randomUUID()}.${EXTENSION_BY_TYPE[type]}`;
-    const filePath = join(UPLOADS_DIR, fileName);
-    await writeFile(filePath, file.buffer);
+    await this.archivos.guardar(CARPETA_INFORMES, fileName, file.buffer, type);
 
     const report = new MedicalReport(
       randomUUID(),
@@ -165,9 +158,14 @@ export class MedicalReportService {
     return (await this.findReadable(id, actor)).toPublic();
   }
 
-  async getFilePath(id: string, actor: Actor): Promise<string> {
+  /**
+   * Devuelve el CONTENIDO y no una ruta: una ruta sólo tiene sentido si el
+   * almacén es un disco, y atarse a eso era el problema original. Con el tope
+   * de 10 MB por archivo, traerlo a memoria es aceptable.
+   */
+  async readFile(id: string, actor: Actor): Promise<{ contenido: Buffer; report: MedicalReport }> {
     const report = await this.findReadable(id, actor);
-    return join(UPLOADS_DIR, report.fileName);
+    return { contenido: await this.archivos.leer(CARPETA_INFORMES, report.fileName), report };
   }
 
   async delete(id: string, doctorUserId: string): Promise<void> {
@@ -176,8 +174,9 @@ export class MedicalReportService {
     if (!report) throw new MedicalReportNotFoundError(id);
     if (report.doctorId !== doctorId) throw new ForbiddenError();
 
-    const filePath = join(UPLOADS_DIR, report.fileName);
-    try { unlinkSync(filePath); } catch { /* file already gone — that is acceptable */ }
+    // El puerto promete que borrar es idempotente, asi que no hace falta
+    // envolverlo: que el archivo ya no este es el resultado buscado.
+    await this.archivos.borrar(CARPETA_INFORMES, report.fileName);
 
     await this.reports.delete(id);
   }

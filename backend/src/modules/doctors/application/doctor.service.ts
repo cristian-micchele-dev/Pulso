@@ -1,8 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { mkdirSync } from 'fs';
-import { unlink, writeFile } from 'fs/promises';
-import { join } from 'path';
 import { ConflictError, ForbiddenError } from '../../../shared/domain/errors';
 import { Actor } from '../../users/domain/actor';
 import { Doctor } from '../domain/doctor';
@@ -18,8 +15,8 @@ import { UserRepository } from '../../users/user.repository.port';
 import { Role } from '../../users/domain/user';
 import { CreateDoctorDto, UpdateDoctorDto, SetAvailabilityDto, CreateScheduleBlockDto } from './dto/doctor.dto';
 import { PaginationDto, PaginatedResult } from '../../../shared/application/pagination';
+import { ALMACEN_DE_ARCHIVOS, AlmacenDeArchivos, CARPETA_AVATARES } from '../../../shared/application/file-storage.port';
 
-const AVATARS_DIR = join(process.cwd(), 'uploads', 'avatars');
 const ALLOWED_IMAGES: SniffedType[] = ['image/jpeg', 'image/png', 'image/webp'];
 const MIME_BY_EXT: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 
@@ -33,9 +30,8 @@ export class DoctorService {
     @Inject(SCHEDULE_BLOCK_REPOSITORY) private readonly scheduleBlocks: ScheduleBlockRepository,
     @Inject(SPECIALTY_REPOSITORY) private readonly specialties: SpecialtyRepository,
     @Inject('USER_REPOSITORY') private readonly users: UserRepository,
-  ) {
-    mkdirSync(AVATARS_DIR, { recursive: true });
-  }
+    @Inject(ALMACEN_DE_ARCHIVOS) private readonly archivos: AlmacenDeArchivos,
+  ) {}
 
   async create(dto: CreateDoctorDto) {
     const user = await this.users.findById(dto.userId);
@@ -105,19 +101,23 @@ export class DoctorService {
     if (!type || !ALLOWED_IMAGES.includes(type)) throw new UnsupportedImageError();
     const ext = EXTENSION_BY_TYPE[type];
     const fileName = `${randomUUID()}.${ext}`;
-    await writeFile(join(AVATARS_DIR, fileName), file.buffer);
+    await this.archivos.guardar(CARPETA_AVATARES, fileName, file.buffer, type);
     await this.discardAvatarFile(d.avatarFile);
     d.avatarFile = fileName;
     await this.doctors.update(d);
     return d.toPublic();
   }
 
-  async getAvatar(id: string): Promise<{ path: string; mimeType: string }> {
+  /** Devuelve el contenido y no una ruta, por lo mismo que los informes. */
+  async getAvatar(id: string): Promise<{ contenido: Buffer; mimeType: string }> {
     const d = await this.doctors.findById(id);
     if (!d) throw new DoctorNotFoundError(id);
     if (!d.avatarFile) throw new AvatarNotFoundError(id);
     const ext = d.avatarFile.split('.').pop() ?? '';
-    return { path: join(AVATARS_DIR, d.avatarFile), mimeType: MIME_BY_EXT[ext] ?? 'application/octet-stream' };
+    return {
+      contenido: await this.archivos.leer(CARPETA_AVATARES, d.avatarFile),
+      mimeType: MIME_BY_EXT[ext] ?? 'application/octet-stream',
+    };
   }
 
   async removeAvatar(id: string, actor: Actor) {
@@ -131,7 +131,7 @@ export class DoctorService {
 
   private async discardAvatarFile(fileName: string | null) {
     if (!fileName) return;
-    try { await unlink(join(AVATARS_DIR, fileName)); } catch { /* already gone; the row is what matters */ }
+    await this.archivos.borrar(CARPETA_AVATARES, fileName);
   }
 
   async setAvailability(doctorId: string, dto: SetAvailabilityDto, actor: Actor) {

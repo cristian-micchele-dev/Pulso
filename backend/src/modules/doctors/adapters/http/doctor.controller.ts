@@ -2,7 +2,6 @@ import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, P
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { actorOf } from '../../../../shared/infra/http/actor';
-import { createReadStream } from 'fs';
 import { JwtAuthGuard, Roles, RolesGuard } from '../../../auth/adapters/http/auth.guards';
 import { Role } from '../../../users/domain/user';
 import { DoctorService } from '../../application/doctor.service';
@@ -50,9 +49,9 @@ export class DoctorController {
 
   @Get(':id/avatar')
   async getAvatar(@Param('id', ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
-    const { path, mimeType } = await this.service.getAvatar(id);
+    const { contenido, mimeType } = await this.service.getAvatar(id);
     res.set({ 'Content-Type': mimeType, 'Cache-Control': 'private, max-age=3600' });
-    return new StreamableFile(createReadStream(path));
+    return new StreamableFile(contenido);
   }
 
   @Delete(':id/avatar') @HttpCode(204) @UseGuards(RolesGuard) @Roles(Role.ADMIN, Role.DOCTOR)

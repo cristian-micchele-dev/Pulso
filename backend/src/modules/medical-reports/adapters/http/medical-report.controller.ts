@@ -18,7 +18,6 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { actorOf } from '../../../../shared/infra/http/actor';
-import { createReadStream } from 'fs';
 import { attachment } from '../../../../shared/infra/http/content-disposition';
 import { JwtAuthGuard, Roles, RolesGuard } from '../../../auth/adapters/http/auth.guards';
 import { Role } from '../../../users/domain/user';
@@ -74,16 +73,18 @@ export class MedicalReportController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const actor = actorOf(req);
-    const report = await this.service.findOne(id, actor);
-    const filePath = await this.service.getFilePath(id, actor);
-    const stream = createReadStream(filePath);
+    // Una sola llamada: trae el contenido y el informe juntos, ya con el
+    // permiso verificado. Si el archivo no esta, lanza ArchivoNoEncontradoError
+    // y el filtro de errores lo convierte en un 404 con mensaje propio, en vez
+    // de reventar el stream a mitad de la respuesta como hacia antes.
+    const { contenido, report } = await this.service.readFile(id, actor);
 
     res.set({
       'Content-Type': report.mimeType,
       'Content-Disposition': attachment(report.originalName),
     });
 
-    return new StreamableFile(stream);
+    return new StreamableFile(contenido);
   }
 
   @Get('patients/:patientId/reports')
