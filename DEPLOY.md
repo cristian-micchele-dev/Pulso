@@ -17,13 +17,29 @@ con un valor provisorio y corrigiéndolo al final.
 
    | Variable | De dónde sale |
    |---|---|
-   | `DATABASE_URL` | Supabase → Project Settings → Database → **Connection pooling** (puerto `6543`) |
-   | `CORS_ORIGIN` | todavía no existe: poné `https://pulso.vercel.app` y corregilo en el paso 3 |
+   | `DATABASE_URL` | Supabase → Connect → **Session pooler** (ver abajo) |
+   | `CORS_ORIGIN` | el dominio que te asignó Vercel, sin barra final |
    | `METRICS_TOKEN` | opcional; sin valor, `/api/v1/metrics` queda abierto |
 
-   > **Usá la cadena del pooler, no la directa.** El plan gratuito de Render
-   > apaga y reinicia el servicio seguido, y cada arranque abre conexiones
-   > nuevas: contra el puerto directo se agota el límite de Supabase.
+   > **Tiene que ser el pooler en modo SESIÓN, no en modo transacción.**
+   >
+   > Supabase ofrece tres cadenas y es fácil tomar la equivocada:
+   >
+   > | Cadena | Puerto | Sirve acá |
+   > |---|---|---|
+   > | Directa (`db.<ref>.supabase.co`) | 5432 | sólo con IPv6 |
+   > | Session pooler (`...pooler.supabase.com`) | 5432 | **sí** |
+   > | Transaction pooler (`...pooler.supabase.com`) | 6543 | **no** |
+   >
+   > La de modo transacción es la que recomienda casi toda la documentación de
+   > despliegue, y acá **rompe los WebSockets**: el adaptador de Socket.IO usa
+   > `LISTEN`/`NOTIFY` (ver `postgres-io.adapter.ts`), y pgBouncer en modo
+   > transacción devuelve la conexión al pool después de cada transacción, así
+   > que no queda ninguna sesión sosteniendo la escucha. Las notificaciones en
+   > vivo dejarían de llegar sin que nada falle de forma visible.
+   >
+   > La directa tampoco sirve: Supabase la publica sólo por IPv6 y el plan
+   > gratuito de Render no sale por ahí.
 
 3. Esperá a que el health check (`/api/v1/health/live`) pase a verde y anotá la
    URL del servicio, de la forma `https://pulso-api.onrender.com`.

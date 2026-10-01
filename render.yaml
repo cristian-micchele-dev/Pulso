@@ -33,8 +33,13 @@ services:
       # publica, y el health check fallaria para siempre.
 
       # La cadena de conexion de Supabase, cargada a mano en el panel.
-      # Usar la del POOLER (puerto 6543), no la directa: el plan gratuito de
-      # Render reinicia seguido y el pooler evita agotar las conexiones.
+      #
+      # Tiene que ser el pooler en modo SESION (puerto 5432 sobre el host
+      # ...pooler.supabase.com), no el de modo transaccion (6543). El adaptador
+      # de WebSockets usa LISTEN/NOTIFY y pgBouncer en modo transaccion devuelve
+      # la conexion al pool despues de cada transaccion: no queda sesion donde
+      # sostener la escucha y las notificaciones en vivo dejan de llegar sin que
+      # nada falle de forma visible. Ver DEPLOY.md.
       - key: DATABASE_URL
         sync: false
 
