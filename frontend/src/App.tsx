@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { Layout } from './components/Layout/Layout';
@@ -45,6 +45,15 @@ export function App() {
     <Suspense fallback={<Spinner />}>
     <AnimatePresence mode="wait">
     <Routes location={location} key={location.pathname}>
+      {/*
+        La raíz manda al panel, y `ProtectedRoute` se encarga de rebotar a
+        /login a quien no tenga sesión. Sin esta ruta, entrar al dominio pelado
+        cae en el comodín de abajo y muestra el "no encontrado" — que es
+        justamente lo que ve cualquiera que abra el enlace por primera vez.
+        En desarrollo no se nota, porque siempre se entra a /login directo.
+      */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
       {/* Public routes */}
       <Route path="/login" element={<AnimatedPage><LoginPage /></AnimatedPage>} />
 
