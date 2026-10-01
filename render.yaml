@@ -1,0 +1,59 @@
+# Blueprint de Render para la API de Pulso.
+#
+# Va en la RAIZ del repositorio a proposito: Render busca render.yaml solo aca,
+# y con el archivo dentro de backend/ el blueprint no se detecta nunca.
+#
+# No se declara ninguna base de datos. La de Pulso vive en Supabase y ya tiene
+# las migraciones corridas; declarar una base aca crearia una segunda, vacia, y
+# Render apuntaria la aplicacion a esa.
+services:
+  - type: web
+    name: pulso-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+
+    # Render reinicia el servicio si esta ruta deja de responder. Es la sonda
+    # "live": contesta sin tocar la base, asi que un problema de base no provoca
+    # un reinicio en bucle que impida diagnosticarlo.
+    healthCheckPath: /api/v1/health/live
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # PORT lo inyecta Render y main.ts ya lo lee. No se declara: fijarlo aca
+      # haria que la aplicacion escuche en un puerto distinto del que Render
+      # publica, y el health check fallaria para siempre.
+
+      # La cadena de conexion de Supabase, cargada a mano en el panel.
+      # Usar la del POOLER (puerto 6543), no la directa: el plan gratuito de
+      # Render reinicia seguido y el pooler evita agotar las conexiones.
+      - key: DATABASE_URL
+        sync: false
+
+      # El dominio del frontend en Vercel, sin barra final. Sin esto la API
+      # responde con el valor por defecto (localhost) y el navegador bloquea
+      # todas las llamadas por CORS.
+      - key: CORS_ORIGIN
+        sync: false
+
+      # Frontend y API viven en dominios distintos, asi que toda llamada es
+      # cross-site y una cookie Lax no viaja. Ver cookie-policy.ts.
+      - key: COOKIE_SAMESITE
+        value: none
+
+      # Render los genera una vez y los conserva entre despliegues. Si se
+      # regeneraran en cada deploy, cada publicacion desloguearia a todo el mundo.
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      - key: LOG_LEVEL
+        value: info
+
+      # Opcional: protege /api/v1/metrics. Sin valor, el endpoint queda abierto.
+      - key: METRICS_TOKEN
+        sync: false

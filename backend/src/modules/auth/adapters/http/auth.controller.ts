@@ -6,6 +6,7 @@ import { randomBytes } from 'crypto';
 import { AuthService } from '../../application/auth.service';
 import { ChangePasswordDto, ForgotPasswordDto, LoginDto, ResetPasswordDto } from '../../../users/application/dto/auth.dto';
 import { JwtAuthGuard } from './auth.guards';
+import { cookiePolicy } from './cookie-policy';
 
 @Controller('auth')
 export class AuthController {
@@ -13,10 +14,10 @@ export class AuthController {
   // Session cookie by default; a remembered login gets an explicit lifetime so it survives closing the browser.
   private cookie(response: Response, token: string, persistUntil?: Date) {
     const maxAge = persistUntil ? { maxAge: Math.max(0, persistUntil.getTime() - Date.now()) } : {};
-    const secure = process.env.NODE_ENV === 'production';
     const path = '/api/v1/auth';
-    response.cookie(process.env.REFRESH_COOKIE_NAME ?? 'refresh_token', token, { httpOnly: true, secure, sameSite: 'lax', path, ...maxAge });
-    response.cookie(process.env.CSRF_COOKIE_NAME ?? 'csrf_token', randomBytes(24).toString('hex'), { secure, sameSite: 'lax', path, ...maxAge });
+    const { sameSite, secure } = cookiePolicy();
+    response.cookie(process.env.REFRESH_COOKIE_NAME ?? 'refresh_token', token, { httpOnly: true, secure, sameSite, path, ...maxAge });
+    response.cookie(process.env.CSRF_COOKIE_NAME ?? 'csrf_token', randomBytes(24).toString('hex'), { secure, sameSite, path, ...maxAge });
   }
   // Más alto que MAX_FAILED_ATTEMPTS a propósito. Este límite frena una ráfaga
   // desde una IP; el bloqueo de cuenta es el que sabe de quién se trata y tiene
