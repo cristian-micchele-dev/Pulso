@@ -19,7 +19,7 @@ npm run build
 Doce reservas simultáneas, en horarios distintos y después todas por el mismo.
 
 ```bash
-PORT=3099 node -r dotenv/config dist/src/main.js &
+PORT=3099 node -r dotenv/config dist/main.js &
 node test/manual/concurrencia.js
 ```
 
@@ -42,7 +42,7 @@ Sube la concurrencia (5 → 20 → 50) sobre una ruta de lectura y reporta rps y
 percentiles.
 
 ```bash
-THROTTLE_LIMIT=1000000 PORT=3099 node -r dotenv/config dist/src/main.js &
+THROTTLE_LIMIT=1000000 PORT=3099 node -r dotenv/config dist/main.js &
 node test/manual/carga-sostenida.js
 ```
 
@@ -61,8 +61,8 @@ Levanta dos backends. El médico abre su socket contra uno y la secretaria le
 manda un mensaje contra el otro.
 
 ```bash
-PORT=3101 node -r dotenv/config dist/src/main.js &
-PORT=3102 node -r dotenv/config dist/src/main.js &
+PORT=3101 node -r dotenv/config dist/main.js &
+PORT=3102 node -r dotenv/config dist/main.js &
 node test/manual/dos-instancias.js
 ```
 
@@ -72,6 +72,38 @@ Es la **única** verificación de que el adaptador de Postgres (`LISTEN/NOTIFY`)
 está enchufado. Si alguien saca `app.useWebSocketAdapter` de `main.ts`, ningún
 test automático se entera: el chat sigue andando con una instancia y se rompe
 recién en producción con dos.
+
+---
+
+## `probar-conexion.js` — una cadena de conexión antes de pegarla en un panel
+
+No necesita el servidor levantado. Recibe la cadena por el entorno y hace **un**
+intento:
+
+```bash
+DATABASE_URL='postgresql://...' node test/manual/probar-conexion.js
+```
+
+Comprueba tres cosas y ninguna es redundante:
+
+1. **Autenticación.** Un despliegue en Render tarda varios minutos para después
+   decir `28P01: password authentication failed`. Esto lo dice en dos segundos.
+2. **Cómo quedó armada la cadena**: usuario, servidor y si es conexión directa,
+   pooler en modo transacción o en modo sesión. Avisa si quedó el marcador
+   `[YOUR-PASSWORD]` sin reemplazar, que es el error más repetido y que el
+   servidor informa igual que una contraseña equivocada.
+3. **`LISTEN`/`NOTIFY`.** Con el pooler en modo transacción pgBouncer devuelve la
+   conexión después de cada transacción y no queda sesión sosteniendo la escucha:
+   la aplicación levanta igual, el login anda, y las notificaciones en vivo no
+   llegan nunca sin un solo error en ningún log.
+
+Nunca imprime la cadena ni la contraseña, así que la salida se puede pegar donde
+sea.
+
+El arranque de la aplicación reintenta **nueve** veces antes de rendirse y Render
+la reinicia, así que depurar a fuerza de despliegues dispara el corta-circuitos
+de Supabase (`ECIRCUITBREAKER`) y bloquea las conexiones un rato. Esta sonda
+existe para no llegar a eso.
 
 ---
 
