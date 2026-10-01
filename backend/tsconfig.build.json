@@ -1,4 +1,12 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // TypeScript 6 dejó de inferir la raíz en silencio: si los archivos de
+    // entrada cuelgan todos de ./src y `rootDir` no está puesto, falla con
+    // TS5011 en vez de adivinar. Dejarlo explícito es lo que hace que la salida
+    // sea `dist/main.js` acá y en cualquier otra máquina, que es lo que busca el
+    // CMD del Dockerfile.
+    "rootDir": "./src"
+  },
   "exclude": ["node_modules", "test", "dist", "**/*.spec.ts", "**/*.e2e-spec.ts"]
 }

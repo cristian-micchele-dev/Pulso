@@ -2,7 +2,10 @@ FROM node:24-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
-COPY tsconfig.json nest-cli.json ./
+# tsconfig.build.json va SI O SI: `nest build` lo prefiere sobre tsconfig.json y
+# es el unico que fija rootDir en ./src. Sin el, TypeScript 6 falla con TS5011
+# porque la raiz quedaria implicita.
+COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY src ./src
 RUN npm run build
 FROM node:24-alpine
