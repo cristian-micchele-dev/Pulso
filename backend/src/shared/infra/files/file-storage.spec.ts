@@ -89,6 +89,24 @@ describe('AlmacenSupabase', () => {
       .rejects.toBeInstanceOf(ArchivoNoEncontradoError);
   });
 
+  it('tambien reconoce el objeto faltante cuando viene en el cuerpo', async () => {
+    // Supabase no siempre contesta 404: tambien responde 400 con not_found en
+    // el cuerpo. Mirando solo el codigo HTTP, un archivo faltante salia como
+    // 500 generico en produccion, que es justo lo que el error de dominio vino
+    // a evitar. Paso de verdad.
+    responder = () =>
+      new Response('{"statusCode":"404","error":"not_found","message":"Object not found"}', { status: 400 });
+
+    await expect(almacen().leer(CARPETA_INFORMES, 'x.pdf'))
+      .rejects.toBeInstanceOf(ArchivoNoEncontradoError);
+  });
+
+  it('borrar tambien tolera el not_found del cuerpo', async () => {
+    responder = () => new Response('{"error":"not_found"}', { status: 400 });
+
+    await expect(almacen().borrar(CARPETA_INFORMES, 'x.pdf')).resolves.not.toThrow();
+  });
+
   it('borrar aguanta el 404, igual que el adaptador de disco', async () => {
     responder = () => new Response('', { status: 404 });
 

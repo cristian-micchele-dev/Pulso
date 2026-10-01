@@ -239,13 +239,14 @@ async function main() {
       `SELECT count(*)::int AS n FROM prescriptions WHERE doctor_id = ANY($1)`, [doctorIds]);
 
     let recetas = 0, informes = 0;
+    let almacen: { guardar: (c: string, n: string, b: Buffer, t: string) => Promise<void>; constructor: { name: string } } | null = null;
     if (yaHayRecetas === 0) {
       // El mismo puerto que usa la aplicación: con STORAGE_DRIVER=supabase los
       // archivos van al bucket, y sin él al disco local. El seed no decide
       // dónde se guardan, igual que no lo decide ningún servicio.
       const { crearAlmacen } = await import('../shared/infra/files/file-storage.module');
       const { CARPETA_INFORMES } = await import('../shared/application/file-storage.port');
-      const almacen = crearAlmacen();
+      almacen = crearAlmacen();
 
       for (const [i, turno] of completados.entries()) {
         const receta = RECETAS[turno.especialidad];
@@ -280,7 +281,13 @@ async function main() {
   pacientes      : ${PACIENTES.length}
   turnos         : ${creados > 0 ? creados : `${yaHay} ya existían, no se tocaron`}
   recetas        : ${recetas > 0 ? recetas : `${yaHayRecetas} ya existían, no se tocaron`}
-  informes       : ${informes > 0 ? informes : "no se tocaron"}
+  informes       : ${informes > 0 ? informes : 'no se tocaron'}${almacen ? ` (en ${almacen.constructor.name})` : ''}${almacen?.constructor.name === 'AlmacenEnDisco' ? `
+
+  ATENCION: los archivos quedaron en el DISCO LOCAL.
+  Si la base a la que apunta DATABASE_URL es la de produccion, las filas
+  van a apuntar a archivos que el servidor no tiene y las descargas van a
+  fallar. Defini STORAGE_DRIVER, SUPABASE_URL y SUPABASE_SERVICE_KEY y
+  volve a correrlo.` : ''}
 
 Para entrar, con cualquiera de estos y la contraseña "${PASSWORD_DEMO}":
   ${emailSecretaria}   (secretaría)

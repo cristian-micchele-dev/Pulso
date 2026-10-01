@@ -3,6 +3,17 @@ import { AlmacenDeArchivos } from '../../application/file-storage.port';
 import { ArchivoNoEncontradoError } from '../../domain/file-not-found.exception';
 
 /**
+ * Si el cuerpo de la respuesta dice que el objeto no existe.
+ *
+ * Supabase marca ese caso en el cuerpo (`"error":"not_found"`) y no siempre en
+ * el codigo HTTP. Se lee el texto crudo y no el JSON parseado porque un cuerpo
+ * que no sea JSON no tiene por que tumbar el manejo del error.
+ */
+function esNoEncontrado(cuerpo: string): boolean {
+  return /not_?found/i.test(cuerpo);
+}
+
+/**
  * Almacén sobre Supabase Storage.
  *
  * Sin SDK: son tres llamadas HTTP y Node trae `fetch`. Agregar una dependencia
@@ -50,11 +61,19 @@ export class AlmacenSupabase implements AlmacenDeArchivos {
 
   async leer(carpeta: string, nombre: string): Promise<Buffer> {
     const r = await fetch(this.endpoint(carpeta, nombre), { headers: this.cabeceras });
-    if (r.status === 404) throw new ArchivoNoEncontradoError(`${carpeta}/${nombre}`);
-    if (!r.ok) {
-      throw new Error(`No se pudo leer ${carpeta}/${nombre}: ${r.status} ${await r.text()}`);
+    if (r.ok) return Buffer.from(await r.arrayBuffer());
+
+    const cuerpo = await r.text();
+
+    // Supabase no siempre contesta 404 cuando el objeto no existe: tambien
+    // responde 400 con `not_found` en el cuerpo. Mirar solo el codigo HTTP
+    // convertia un archivo faltante en un 500 generico, justo el caso que el
+    // error de dominio vino a explicar. Se consultan los dos.
+    if (r.status === 404 || esNoEncontrado(cuerpo)) {
+      throw new ArchivoNoEncontradoError(`${carpeta}/${nombre}`);
     }
-    return Buffer.from(await r.arrayBuffer());
+
+    throw new Error(`No se pudo leer ${carpeta}/${nombre}: ${r.status} ${cuerpo}`);
   }
 
   async borrar(carpeta: string, nombre: string): Promise<void> {
@@ -62,9 +81,13 @@ export class AlmacenSupabase implements AlmacenDeArchivos {
       method: 'DELETE',
       headers: this.cabeceras,
     });
-    // Idempotente como el puerto promete: un 404 ya cumple lo que se pedía.
-    if (!r.ok && r.status !== 404) {
-      throw new Error(`No se pudo borrar ${carpeta}/${nombre}: ${r.status} ${await r.text()}`);
+    if (r.ok) return;
+
+    // Idempotente como el puerto promete: que ya no este es el resultado
+    // buscado, lo informe Supabase por codigo o por cuerpo.
+    const cuerpo = await r.text();
+    if (r.status !== 404 && !esNoEncontrado(cuerpo)) {
+      throw new Error(`No se pudo borrar ${carpeta}/${nombre}: ${r.status} ${cuerpo}`);
     }
   }
 }
