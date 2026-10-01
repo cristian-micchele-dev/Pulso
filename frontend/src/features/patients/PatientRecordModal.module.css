@@ -1,0 +1,80 @@
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
+.datos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  /* Empuja el boton de descarga al extremo sin posicionarlo a mano. */
+  flex: 1;
+  min-width: 0;
+}
+
+.datos strong {
+  color: var(--text);
+  font-weight: 600;
+  /* Un informe puede llamarse cualquier cosa: que no rompa la fila. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datos small {
+  font-size: 0.75rem;
+}
+
+.estado,
+.vacio {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/*
+ * El rechazo por falta de relacion de atencion NO se pinta como error: es la
+ * regla funcionando. Con los colores de alarma, el medico creeria que el
+ * sistema fallo cuando en realidad lo esta protegiendo.
+ */
+.denegado {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle, transparent);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}

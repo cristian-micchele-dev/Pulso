@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Table } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { PatientRecordModal } from './PatientRecordModal';
 import { Modal } from '../../components/ui/Modal';
 import { Pagination } from '../../components/ui/Pagination';
 import { PatientForm } from './PatientForm';
@@ -60,6 +61,18 @@ export function PatientsPage() {
   };
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'DOCTOR' || user?.role === 'SECRETARY';
+
+  /*
+   * La historia clinica no es un dato administrativo. La politica del backend
+   * dice SECRETARY: nunca —"the front desk schedules care, it does not read
+   * it"— asi que para la recepcion el boton no se deshabilita: no existe.
+   * Mostrar algo que siempre va a dar error es peor que no mostrarlo.
+   *
+   * Esto es cortesia de interfaz, no seguridad: aunque alguien forzara el
+   * boton, la API rechaza y lo deja auditado.
+   */
+  const puedeVerHistoria = user?.role === 'ADMIN' || user?.role === 'DOCTOR';
+  const [historiaDe, setHistoriaDe] = useState<Patient | null>(null);
 
   const columns = [
     {
@@ -116,9 +129,21 @@ export function PatientsPage() {
             header: 'Acciones',
             hideUntilHover: true,
             align: 'right' as const,
-            width: '120px',
+            width: '200px',
             render: (p: Patient) => (
               <div className={styles.actions}>
+                {puedeVerHistoria && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHistoriaDe(p);
+                    }}
+                  >
+                    Historia
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -193,6 +218,10 @@ export function PatientsPage() {
             onCancel={handleCloseModal}
           />
         </Modal>
+      )}
+
+      {puedeVerHistoria && (
+        <PatientRecordModal patient={historiaDe} onClose={() => setHistoriaDe(null)} />
       )}
     </div>
   );
