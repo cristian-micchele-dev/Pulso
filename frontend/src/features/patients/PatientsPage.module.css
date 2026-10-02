@@ -129,3 +129,41 @@
     min-width: 0;
   }
 }
+
+/*
+ * Pestañas del paciente: sus datos y su historia clínica.
+ *
+ * Existen porque un formulario de EDICIÓN y un historial de LECTURA en el mismo
+ * scroll se leen como una sola cosa, y no lo son: uno se completa, el otro se
+ * consulta. Separarlos deja claro qué se puede tocar.
+ */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab,
+.tabActiva {
+  padding: 0.625rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* El borde inferior se mueve con la selección: sin transición, salta. */
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tabActiva {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}

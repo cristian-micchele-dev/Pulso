@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Download, FileText, Image, Pill } from 'lucide-react';
-import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { reportsApi, type MedicalReport } from '../../api/reports';
 import { prescriptionsApi, type Prescription } from '../../api/prescriptions';
 import { apiErrorMessage } from '../../api/client';
 import type { Patient } from '../../api/patients';
-import styles from './PatientRecordModal.module.css';
+import styles from './PatientRecord.module.css';
 
-interface PatientRecordModalProps {
+interface PatientRecordProps {
+  /** Null mientras no haya nadie elegido: asi no se consulta de mas. */
   patient: Patient | null;
-  onClose: () => void;
 }
 
 /** Igual que en el detalle del turno: la fecha corta, sin hora. */
@@ -32,7 +31,7 @@ const tamano = (bytes: number) =>
  * La auditoría sirve para detectar accesos indebidos: llenarla de rechazos
  * esperados entierra el día que haya uno real.
  */
-export function PatientRecordModal({ patient, onClose }: PatientRecordModalProps) {
+export function PatientRecord({ patient }: PatientRecordProps) {
   /*
    * El estado viene ETIQUETADO con el paciente al que pertenece.
    *
@@ -85,7 +84,7 @@ export function PatientRecordModal({ patient, onClose }: PatientRecordModalProps
   if (!patient) return null;
 
   return (
-    <Modal isOpen onClose={onClose} title={`Historia clínica — ${patient.name}`} size="lg">
+    <>
       {cargando && <p className={styles.estado}>Cargando…</p>}
 
       {error && <p className={styles.denegado}>{error}</p>}
@@ -151,6 +150,6 @@ export function PatientRecordModal({ patient, onClose }: PatientRecordModalProps
           </section>
         </div>
       )}
-    </Modal>
+    </>
   );
 }

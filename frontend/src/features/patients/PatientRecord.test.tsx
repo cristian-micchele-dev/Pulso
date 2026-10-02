@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { PatientRecordModal } from './PatientRecordModal';
+import { PatientRecord } from './PatientRecord';
 
 const { reportsApi, prescriptionsApi } = vi.hoisted(() => ({
   reportsApi: { findByPatient: vi.fn(), download: vi.fn() },
@@ -19,9 +19,9 @@ beforeEach(() => {
   prescriptionsApi.findByPatient.mockResolvedValue(pagina([]));
 });
 
-describe('PatientRecordModal', () => {
+describe('PatientRecord', () => {
   it('no pide nada mientras no haya un paciente elegido', () => {
-    render(<PatientRecordModal patient={null} onClose={vi.fn()} />);
+    render(<PatientRecord patient={null} />);
 
     // Es la razon de ser del componente: cada rechazo queda auditado, asi que
     // no se consulta la historia hasta que alguien la pide de verdad.
@@ -43,7 +43,7 @@ describe('PatientRecordModal', () => {
       }]),
     );
 
-    render(<PatientRecordModal patient={paciente} onClose={vi.fn()} />);
+    render(<PatientRecord patient={paciente} />);
 
     expect(await screen.findByText('Radiografía de tórax')).toBeInTheDocument();
     expect(await screen.findByText('Ibuprofeno 400mg')).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe('PatientRecordModal', () => {
     // que el sistema esta roto.
     reportsApi.findByPatient.mockRejectedValue({ status: 403 });
 
-    render(<PatientRecordModal patient={paciente} onClose={vi.fn()} />);
+    render(<PatientRecord patient={paciente} />);
 
     expect(await screen.findByText(/no atendiste a esta persona/i)).toBeInTheDocument();
   });
@@ -67,7 +67,7 @@ describe('PatientRecordModal', () => {
     // reportaria el problema real.
     reportsApi.findByPatient.mockRejectedValue({ status: 500 });
 
-    render(<PatientRecordModal patient={paciente} onClose={vi.fn()} />);
+    render(<PatientRecord patient={paciente} />);
 
     await waitFor(() => expect(screen.queryByText(/no atendiste/i)).not.toBeInTheDocument());
     expect(screen.getByText(/no se pudo cargar/i)).toBeInTheDocument();
@@ -82,12 +82,12 @@ describe('PatientRecordModal', () => {
       pagina([{ id: 'r1', title: 'Estudio de Ana', mimeType: 'application/pdf', sizeBytes: 10, createdAt: '2026-01-01T00:00:00.000Z' }]),
     );
 
-    const { rerender } = render(<PatientRecordModal patient={paciente} onClose={vi.fn()} />);
+    const { rerender } = render(<PatientRecord patient={paciente} />);
     expect(await screen.findByText('Estudio de Ana')).toBeInTheDocument();
 
     let resolver: (v: unknown) => void = () => {};
     reportsApi.findByPatient.mockReturnValueOnce(new Promise((r) => { resolver = r; }));
-    rerender(<PatientRecordModal patient={{ id: 'p2', name: 'Beto Díaz' } as never} onClose={vi.fn()} />);
+    rerender(<PatientRecord patient={{ id: 'p2', name: 'Beto Díaz' } as never} />);
 
     // Mientras la consulta del segundo viaja, lo del primero ya no esta.
     await waitFor(() => expect(screen.queryByText('Estudio de Ana')).not.toBeInTheDocument());
@@ -95,7 +95,7 @@ describe('PatientRecordModal', () => {
   });
 
   it('avisa cuando la persona todavia no tiene nada cargado', async () => {
-    render(<PatientRecordModal patient={paciente} onClose={vi.fn()} />);
+    render(<PatientRecord patient={paciente} />);
 
     expect(await screen.findByText(/todavía no tiene informes/i)).toBeInTheDocument();
     expect(screen.getByText(/todavía no tiene recetas/i)).toBeInTheDocument();

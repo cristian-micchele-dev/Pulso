@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Table } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { PatientRecordModal } from './PatientRecordModal';
+import { PatientRecord } from './PatientRecord';
 import { Modal } from '../../components/ui/Modal';
 import { Pagination } from '../../components/ui/Pagination';
 import { PatientForm } from './PatientForm';
@@ -39,6 +39,7 @@ export function PatientsPage() {
   };
 
   const handleOpenEdit = (patient: Patient) => {
+    setPestana('datos');
     setSelectedPatient(patient);
     setModalOpen(true);
   };
@@ -72,7 +73,8 @@ export function PatientsPage() {
    * boton, la API rechaza y lo deja auditado.
    */
   const puedeVerHistoria = user?.role === 'ADMIN' || user?.role === 'DOCTOR';
-  const [historiaDe, setHistoriaDe] = useState<Patient | null>(null);
+  /** Qué pestaña se está mirando dentro del modal del paciente. */
+  const [pestana, setPestana] = useState<'datos' | 'historia'>('datos');
 
   const columns = [
     {
@@ -129,21 +131,9 @@ export function PatientsPage() {
             header: 'Acciones',
             hideUntilHover: true,
             align: 'right' as const,
-            width: '200px',
+            width: '120px',
             render: (p: Patient) => (
               <div className={styles.actions}>
-                {puedeVerHistoria && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setHistoriaDe(p);
-                    }}
-                  >
-                    Historia
-                  </Button>
-                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -209,19 +199,53 @@ export function PatientsPage() {
         <Modal
           isOpen={modalOpen}
           onClose={handleCloseModal}
-          title={selectedPatient ? 'Editar Paciente' : 'Nuevo Paciente'}
-          size="md"
+          title={selectedPatient ? selectedPatient.name : 'Nuevo Paciente'}
+          size={selectedPatient && puedeVerHistoria ? 'lg' : 'md'}
         >
-          <PatientForm
-            patient={selectedPatient}
-            onSubmit={handleSubmit}
-            onCancel={handleCloseModal}
-          />
-        </Modal>
-      )}
+          {/*
+            Las pestañas aparecen sólo sobre un paciente que ya existe: uno que
+            se está creando todavía no tiene historia que mostrar.
+          */}
+          {selectedPatient && puedeVerHistoria && (
+            <div className={styles.tabs} role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pestana === 'datos'}
+                className={pestana === 'datos' ? styles.tabActiva : styles.tab}
+                onClick={() => setPestana('datos')}
+              >
+                Datos
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pestana === 'historia'}
+                className={pestana === 'historia' ? styles.tabActiva : styles.tab}
+                onClick={() => setPestana('historia')}
+              >
+                Historia clínica
+              </button>
+            </div>
+          )}
 
-      {puedeVerHistoria && (
-        <PatientRecordModal patient={historiaDe} onClose={() => setHistoriaDe(null)} />
+          {pestana === 'datos' ? (
+            <PatientForm
+              patient={selectedPatient}
+              onSubmit={handleSubmit}
+              onCancel={handleCloseModal}
+            />
+          ) : (
+            /*
+              Se monta recién al elegir la pestaña, no al abrir el paciente.
+              Cada rechazo de la política de acceso queda auditado: pedir la
+              historia de entrada llenaría el registro de "acceso denegado"
+              sobre gente que el médico nunca atendió, y enterraría el día que
+              haya uno real.
+            */
+            <PatientRecord patient={selectedPatient ?? null} />
+          )}
+        </Modal>
       )}
     </div>
   );

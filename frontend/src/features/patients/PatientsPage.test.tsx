@@ -12,7 +12,7 @@ const { auth, patientsApi } = vi.hoisted(() => ({
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../../api/patients', () => ({ patientsApi }));
 vi.mock('../../hooks/useToast', () => ({ useToast: () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }) }));
-vi.mock('./PatientRecordModal', () => ({ PatientRecordModal: () => null }));
+vi.mock('./PatientRecord', () => ({ PatientRecord: () => <p>historia montada</p> }));
 
 const row = (id: string, name: string) => ({
   id, name, email: `${id}@mail.com`, phone: null, dateOfBirth: null, address: null, insuranceNumber: null, notes: null, active: true, createdAt: '2026-01-01T00:00:00.000Z',
@@ -59,25 +59,49 @@ describe('PatientsPage — búsqueda', () => {
 describe('PatientsPage — quién puede abrir la historia clínica', () => {
   afterEach(() => { auth.user.role = 'ADMIN'; });
 
-  it.each(['ADMIN', 'DOCTOR'] as const)('%s ve el acceso a la historia', async (role) => {
-    auth.user.role = role;
+  const abrirPaciente = async () => {
     renderPage();
-    await screen.findByText('Paciente 0');
+    await userEvent.click(await screen.findByText('Paciente 0'));
+  };
 
-    expect(screen.getAllByRole('button', { name: 'Historia' }).length).toBeGreaterThan(0);
+  it.each(['ADMIN', 'DOCTOR'] as const)('%s ve la pestaña dentro del paciente', async (role) => {
+    auth.user.role = role;
+    await abrirPaciente();
+
+    expect(screen.getByRole('tab', { name: 'Historia clínica' })).toBeInTheDocument();
   });
 
-  it('secretaría NO lo ve: la historia clínica no es un dato administrativo', async () => {
-    // La política del backend dice SECRETARY: nunca. Acá el botón no se
-    // deshabilita, directamente no existe: ofrecer algo que siempre va a dar
-    // error es peor que no ofrecerlo. Que igual pueda editar al paciente
-    // confirma que la pantalla sigue siendo suya, lo que no es suyo es la
+  it('la historia se monta recién al elegir la pestaña, no al abrir el paciente', async () => {
+    // Cada rechazo de la política de acceso queda auditado. Consultarla de
+    // entrada llenaría el registro de "acceso denegado" sobre gente que el
+    // médico nunca atendió, y enterraría el día que haya uno real.
+    await abrirPaciente();
+    expect(screen.queryByText('historia montada')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Historia clínica' }));
+    expect(screen.getByText('historia montada')).toBeInTheDocument();
+  });
+
+  it('secretaría NO la ve: la historia clínica no es un dato administrativo', async () => {
+    // La política del backend dice SECRETARY: nunca. La pestaña no se
+    // deshabilita, directamente no existe. Que igual pueda editar al paciente
+    // confirma que la pantalla sigue siendo suya; lo que no es suyo es la
     // historia.
     auth.user.role = 'SECRETARY';
-    renderPage();
-    await screen.findByText('Paciente 0');
+    await abrirPaciente();
 
-    expect(screen.queryByRole('button', { name: 'Historia' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Editar' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('tab', { name: 'Historia clínica' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/nombre completo/i)).toBeInTheDocument();
+  });
+
+  it('al abrir otro paciente vuelve a Datos y no queda en la pestaña anterior', async () => {
+    await abrirPaciente();
+    await userEvent.click(screen.getByRole('tab', { name: 'Historia clínica' }));
+    expect(screen.getByText('historia montada')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    await userEvent.click(screen.getByText('Paciente 1'));
+
+    expect(screen.queryByText('historia montada')).not.toBeInTheDocument();
   });
 });
