@@ -128,6 +128,7 @@ src/
 
 - **Caché de datos con TanStack Query.** `useFetch(['recurso', ...params], fetcher)`: navegar entre páginas no vuelve a pedir datos; una mutación invalida por prefijo de recurso, así el dropdown de especialidades en Doctores se actualiza cuando creás una en Especialidades.
 - **Lazy loading por ruta**, tema claro/oscuro con tokens CSS, `prefers-reduced-motion` y `focus-visible` globales.
+- **Las piezas con estado que se mira entre sí viven en hooks propios** — `useSlots` (horarios de un médico para un día), `useDebouncedValue`, `useFetch`. No es para acortar archivos: es que un componente con veinte trozos de estado tiene un orden de asentamiento que **emerge** en vez de estar escrito. `useSlots` tiene siete tests, y dos de ellos cubren comportamientos que la pantalla no tenía: olvidar la hora elegida al cambiar de fecha, y descartar la respuesta de una consulta que quedó vieja cuando se cambia de día rápido.
 
 ---
 
@@ -337,5 +338,5 @@ Anotada a propósito — son decisiones de alcance, no olvidos.
 - **`tsconfig.json` incluye `src` y `test`.** Por eso hizo falta un `tsconfig.build.json` con `rootDir` explícito: sin él, TypeScript 6 falla con `TS5011` al compilar sólo `src` dentro de la imagen. Funciona, pero son dos configuraciones donde debería alcanzar una.
 - **Nada limpia el bucket.** Borrar un informe borra su archivo, pero no hay proceso que detecte huérfanos: si una fila se pierde sin pasar por la aplicación, el PDF queda ocupando espacio para siempre. Con el volumen de una clínica chica no molesta; con historia de diez años, sí.
 - **Restore de backup sin probar.** Supabase hace backups; nadie verificó que se puedan recuperar. Un backup no probado es una esperanza.
-- **Cinco pantallas del frontend entre 437 y 577 líneas.** El backend resuelve su pieza más compleja en ~230.
+- **Siete pantallas del frontend pasan las 400 líneas** (419 a 546). El backend resuelve su pieza más compleja en ~230. Pero el largo resultó ser mala métrica: `DashboardPage` tiene 437 líneas de las cuales 152 son JSX y 7 hooks — describe mucho, no hace mucho. Lo que sí medía el riesgo era **cuántos trozos de estado se miran entre sí**: `NewAppointmentPage` tenía 21 y cuatro efectos, y era la única con una dependencia circular real. Ya se le extrajo `useSlots`; quedan `AvailabilityPage` y `UsersPage` con 15 cada una.
 - **Alertas sin destino.** `backend/docs/alerts.yml` tiene las reglas listas; falta dónde correr el Prometheus.
