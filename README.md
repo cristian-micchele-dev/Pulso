@@ -94,6 +94,24 @@ Puntos que vale la pena mirar:
 - **Tiempo del hospital centralizado** — `shared/infra/time/format.ts` (`toClinicClock`, `clinicDayRange`). Un solo lugar sabe de zonas horarias.
 - **Migraciones explícitas** (`synchronize: false`), reversibles, incluyendo cambios de enum en Postgres.
 - **Errores como Problem Details (RFC 7807)** con `code` estable para el frontend.
+- **El almacén de archivos es un puerto** — `shared/application/file-storage.port.ts`, con adaptador de disco para desarrollo y de Supabase Storage para producción.
+
+Ese último merece la explicación larga, porque es el caso donde la arquitectura
+dejó de ser teoría:
+
+> Los informes médicos se escribían con `fs` directo **desde la capa de
+> aplicación**. Parecía una impureza menor. Pero el disco de un servicio en la
+> nube es efímero, así que al desplegar los archivos subidos desaparecían al
+> primer reinicio mientras sus filas en la base seguían apuntándolos.
+>
+> **El bug de producción y la violación arquitectónica eran el mismo problema.**
+> Como no existía el puerto, arreglar algo de infraestructura obligaba a meter
+> mano en la lógica de negocio.
+>
+> Después de extraerlo, `fs` quedó en **un solo archivo** de todo `src` —el
+> adaptador de disco— y cambiar de almacén pasó a ser una variable de entorno.
+> Eso es lo que compra la disciplina de puertos y adaptadores: no elegancia,
+> sino no tener que operar a corazón abierto cuando la infraestructura traiciona.
 
 ### Frontend — Feature-based
 
@@ -180,7 +198,8 @@ contraseña para entrar.
 
 ### Variables de entorno (backend)
 
-Validadas al arrancar con `class-validator` (`src/config/env.schema.ts`). Si falta una, el proceso no levanta.
+Las de la primera tabla se validan al arrancar con `class-validator`
+(`src/config/env.schema.ts`): si falta una, el proceso no levanta.
 
 | Variable | Obligatoria | Notas |
 |---|---|---|
@@ -188,12 +207,52 @@ Validadas al arrancar con `class-validator` (`src/config/env.schema.ts`). Si fal
 | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` | sí | mínimo 32 caracteres |
 | `NODE_ENV` | no | `development` · `test` · `production` |
 | `PORT` | no | default `3000` |
-| `CORS_ORIGIN` | no | origen del frontend |
+| `CORS_ORIGIN` | no | origen del frontend, **sin barra final** |
 | `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `JWT_ISSUER` | no | defaults `15m`, `7d` |
-| `JWT_REMEMBER_TTL` | no | vida de la sesión con "Recordarme" (default `30d`) |
 | `REFRESH_COOKIE_NAME`, `CSRF_COOKIE_NAME` | no | |
 | `SWAGGER_ENABLED` | no | nunca se expone en `production` |
-| `DATABASE_SSL` | no | `false` para desactivar SSL en migraciones (CI / Postgres local) |
+
+Las de abajo **no** pasan por el esquema: se leen donde se usan y tienen valor por
+defecto, así que el proyecto arranca sin ninguna de ellas. Eso es cómodo en
+desarrollo y **peligroso al desplegar**, porque un servicio mal configurado
+levanta igual y falla más tarde. Por eso las dos que pueden causar pérdida de
+datos —`STORAGE_DRIVER` con sus credenciales— sí interrumpen el arranque si
+quedan a medias.
+
+| Variable | Default | Notas |
+|---|---|---|
+| `JWT_REMEMBER_TTL` | `30d` | vida de la sesión con "Recordarme" |
+| `DATABASE_SSL` | activo | `false` para Postgres local o CI |
+| `DB_POOL_MAX` | `10` | conexiones por instancia |
+| `THROTTLE_LIMIT`, `THROTTLE_TTL` | `100`, `60s` | límite de peticiones por IP |
+| `METRICS_TOKEN` | — | sin valor, `/api/v1/metrics` queda abierto |
+| `COOKIE_SAMESITE` | `lax` | **`none` si el frontend vive en otro dominio.** Ver [despliegue](#despliegue) |
+| `STORAGE_DRIVER` | `disk` | `supabase` para almacén remoto |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | — | obligatorias con `STORAGE_DRIVER=supabase`; si falta una, el proceso **no** levanta |
+
+---
+
+## Despliegue
+
+Frontend en **Vercel**, API en **Render**, base y archivos en **Supabase**. El
+paso a paso está en **[DEPLOY.md](DEPLOY.md)**; acá va lo que no es obvio y sólo
+se descubre desplegando.
+
+| Lo que parecía un detalle | Lo que pasaba |
+|---|---|
+| **La cookie de refresh era `SameSite=Lax`** | Con el frontend en un dominio y la API en otro, el navegador considera cross-site cada llamada y **no manda la cookie**. El login entraba y al recargar la sesión se perdía, sin un solo error en el servidor. En `localhost` no se reproduce nunca. |
+| **Los archivos iban al disco** | El disco de Render es efímero y el plan gratuito apaga el servicio a los 15 minutos. Un informe subido desaparecía al rato mientras su fila en la base seguía apuntándolo. |
+| **El pooler de Supabase en modo transacción** | Es el que recomienda casi toda la documentación, y acá rompe los WebSockets: el adaptador de Socket.IO usa `LISTEN`/`NOTIFY` y pgBouncer devuelve la conexión después de cada transacción. Hace falta el de **modo sesión**. |
+| **No existía ruta para `/`** | Entrar al dominio pelado caía en el comodín y mostraba el "no encontrado". En desarrollo no se nota porque uno entra a `/login` directo. |
+
+Ninguno de los cuatro era código mal escrito: eran **supuestos que sólo se rompen
+fuera de la máquina de uno**. Desplegar no fue el último paso del proyecto, fue
+un test que nunca se había corrido.
+
+De ahí salió la herramienta que más tiempo ahorró: `backend/test/manual/probar-conexion.js`
+valida una cadena de conexión en dos segundos —autenticación, modo del pooler y
+`LISTEN`/`NOTIFY`— sin imprimir la contraseña y sin gastar un despliegue de
+cinco minutos.
 
 ---
 
@@ -274,7 +333,9 @@ Anotada a propósito — son decisiones de alcance, no olvidos.
 
 - **Sin cola de trabajo asíncrono.** Emails y notificaciones se despachan dentro del request. El `Mailer` actual es un no-op.
 - **Rate limiting por instancia.** El throttler cuenta en memoria: con N instancias el límite efectivo se multiplica por N. El bloqueo de cuenta, que es la defensa que importa, sí vive en Postgres.
-- **Techo de conexiones.** Cada instancia toma hasta `DB_POOL_MAX` (10 por defecto) y el servidor tiene un `max_connections` finito. Medido contra Supabase: ~4 instancias antes de agotarlo. Para más hace falta un pooler.
+- **Techo de conexiones.** Cada instancia toma hasta `DB_POOL_MAX` (10 por defecto) y el servidor tiene un `max_connections` finito. Medido contra la conexión directa de Supabase: ~4 instancias antes de agotarlo. En producción se usa el pooler en modo sesión, que corre bastante ese techo — pero no lo elimina, porque el modo sesión sostiene una conexión por cliente.
+- **`tsconfig.json` incluye `src` y `test`.** Por eso hizo falta un `tsconfig.build.json` con `rootDir` explícito: sin él, TypeScript 6 falla con `TS5011` al compilar sólo `src` dentro de la imagen. Funciona, pero son dos configuraciones donde debería alcanzar una.
+- **Nada limpia el bucket.** Borrar un informe borra su archivo, pero no hay proceso que detecte huérfanos: si una fila se pierde sin pasar por la aplicación, el PDF queda ocupando espacio para siempre. Con el volumen de una clínica chica no molesta; con historia de diez años, sí.
 - **Restore de backup sin probar.** Supabase hace backups; nadie verificó que se puedan recuperar. Un backup no probado es una esperanza.
 - **Cinco pantallas del frontend entre 437 y 577 líneas.** El backend resuelve su pieza más compleja en ~230.
 - **Alertas sin destino.** `backend/docs/alerts.yml` tiene las reglas listas; falta dónde correr el Prometheus.
