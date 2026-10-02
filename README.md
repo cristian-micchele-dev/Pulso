@@ -34,13 +34,17 @@ cancelar y reprogramar sin romper nada.
 
 <br>
 
-**Mi Agenda.** Los turnos se acumulan para siempre: la historia clínica se guarda 10 años y de cada turno cuelgan informes, recetas y auditoría. Por eso no se borran — se deja de mostrarlos. El selector **Próximos · Historial · Todos** recorta, y la búsqueda la resuelve la base, no el navegador.
+**Turnos.** Los turnos se acumulan para siempre: la historia clínica se guarda 10 años y de cada turno cuelgan informes, recetas y auditoría. Por eso no se borran — se deja de mostrarlos. El selector **Próximos · Historial · Todos** recorta, y la búsqueda la resuelve la base, no el navegador. Cada turno lleva un código `TM-` que sale de una secuencia de Postgres, así que es único aunque dos personas reserven a la vez.
 
-![Listado de turnos](docs/img/agenda.png)
+![Listado de turnos](docs/img/turnos.png)
 
 **Mensajes.** Chat interno del personal. Cada código `TM-` que alguien escribe se vuelve un enlace al turno, para cerrar la distancia entre la conversación y la reserva de la que habla. El aviso de arriba no es decorativo: las notas clínicas viven en el turno, no acá.
 
 ![Chat interno](docs/img/mensajes.png)
+
+**Historia clínica.** Los informes y las recetas cuelgan de la persona, no de la consulta, así que se ven desde el paciente. La pestaña sólo existe para ADMIN y médicos: la política del backend dice que la recepción agenda la atención, no la lee. Y se consulta recién al abrirla, nunca al listar pacientes — cada rechazo queda auditado, y llenar ese registro de "acceso denegado" esperados enterraría el día que haya uno real.
+
+![Historia clínica de un paciente](docs/img/historia.png)
 
 **Calendario.** Los puntos de cada día salen de una consulta que agrupa por día y estado en el huso del hospital, no de traerse los turnos y contarlos en el navegador.
 
