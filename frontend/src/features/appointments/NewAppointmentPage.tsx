@@ -17,7 +17,7 @@ import { Check } from 'lucide-react';
 import { addDaysLocal, localDateTimeToIso, todayLocal } from '../../utils/date';
 import styles from './NewAppointmentPage.module.css';
 import { apiErrorMessage } from '../../api/client';
-import { buildSlots } from './buildSlots';
+import { useSlots } from './useSlots';
 
 // ── Step kinds ──────────────────────────────────────────────────────────────
 type StepKind = 'patient' | 'specialty' | 'doctor' | 'datetime' | 'confirm';
@@ -115,10 +115,9 @@ export function NewAppointmentPage() {
 
   // DateTime
   const [selectedDate, setSelectedDate]           = useState(getTomorrowDate());
-  const [availabilityLoading, setAvailabilityLoading] = useState(false);
-  const [allSlots, setAllSlots]                   = useState<string[]>([]);
-  const [bookedSlots, setBookedSlots]             = useState<Set<string>>(new Set());
-  const [selectedTime, setSelectedTime]           = useState<string | null>(null);
+  // Los horarios son del hook: él sabe cuándo pedirlos, cuándo descartar una
+  // respuesta vieja y cuándo olvidar la hora elegida.
+  const slots = useSlots(selectedDoctor?.id, selectedDate, currentKind === 'datetime');
 
   // For DOCTOR role: resolve own profile on mount
   const [initLoading, setInitLoading] = useState(user?.role === 'DOCTOR');
@@ -129,75 +128,51 @@ export function NewAppointmentPage() {
       .then(d => setSelectedDoctor(d))
       .catch(() => toast.error('Error al cargar tu perfil de médico'))
       .finally(() => setInitLoading(false));
-  }, [user]);
+  }, [user, toast]);
 
-  // Load data when entering each step
+  /*
+   * Un efecto por cosa que se carga, y no uno que mira el paso y decide.
+   *
+   * El efecto único declaraba depender de `step` y `debouncedQuery` mientras
+   * leía otras siete cosas. Eso no es una formalidad del linter: significa que
+   * React no sabe cuándo volver a correrlo, así que el momento en que cada
+   * dato llega termina dependiendo del orden en que se asienta el resto.
+   *
+   * Separados, cada uno dice exactamente qué lo despierta y se puede leer solo.
+   */
   useEffect(() => {
-    if (currentKind === 'patient') loadPatients(debouncedQuery);
+    if (currentKind !== 'patient') return;
+    loadPatients(debouncedQuery);
+  }, [currentKind, debouncedQuery]);
 
-    if (currentKind === 'specialty' && specialties.length === 0) {
-      setSpecialtiesLoading(true);
-      specialtiesApi.findAll(1, 100)
-        .then(res => setSpecialties(res.data.filter(s => s.active)))
-        .catch(() => toast.error('Error al cargar especialidades'))
-        .finally(() => setSpecialtiesLoading(false));
-    }
-
-    if (currentKind === 'doctor' && allDoctors.length === 0) {
-      setDoctorsLoading(true);
-      doctorsApi.findAll(1, 100)
-        .then(res => setAllDoctors(res.data.filter(d => d.active)))
-        .catch(() => toast.error('Error al cargar doctores'))
-        .finally(() => setDoctorsLoading(false));
-    }
-
-    if (currentKind === 'datetime') {
-      const doctorId = selectedDoctor?.id;
-      if (doctorId) loadSlots(doctorId, selectedDate);
-    }
-  }, [step, debouncedQuery]);
-
-  // Reload slots when date changes (only when on datetime step)
   useEffect(() => {
-    if (currentKind !== 'datetime') return;
-    const doctorId = selectedDoctor?.id;
-    if (doctorId) loadSlots(doctorId, selectedDate);
-  }, [selectedDate]);
+    // Las especialidades no cambian durante una reserva: se piden una vez.
+    if (currentKind !== 'specialty' || specialties.length > 0) return;
+
+    setSpecialtiesLoading(true);
+    specialtiesApi.findAll(1, 100)
+      .then((res) => setSpecialties(res.data.filter((e) => e.active)))
+      .catch(() => toast.error('Error al cargar especialidades'))
+      .finally(() => setSpecialtiesLoading(false));
+  }, [currentKind, specialties.length, toast]);
+
+  useEffect(() => {
+    if (currentKind !== 'doctor' || allDoctors.length > 0) return;
+
+    setDoctorsLoading(true);
+    doctorsApi.findAll(1, 100)
+      .then((res) => setAllDoctors(res.data.filter((d) => d.active)))
+      .catch(() => toast.error('Error al cargar doctores'))
+      .finally(() => setDoctorsLoading(false));
+  }, [currentKind, allDoctors.length, toast]);
 
   const filteredDoctors = selectedSpecialty
     ? allDoctors.filter(d => d.specialtyId === selectedSpecialty.id)
     : allDoctors;
 
-  const loadSlots = async (doctorId: string, date: string) => {
-    setAvailabilityLoading(true);
-    setAllSlots([]);
-    setBookedSlots(new Set());
-    setSelectedTime(null);
-    try {
-      const [avail, apptRes] = await Promise.all([
-        doctorsApi.getAvailability(doctorId, date),
-        appointmentsApi.findAll({ doctorId, from: date, to: date }),
-      ]);
-      setAllSlots(buildSlots(avail, date));
-      const booked = new Set(
-        (apptRes.data ?? [])
-          .filter(a => a.status !== 'CANCELLED')
-          .map(a => {
-            const d = new Date(a.dateTime);
-            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          }),
-      );
-      setBookedSlots(booked);
-    } catch (err) {
-      toast.error(apiErrorMessage(err, 'Error al cargar los horarios disponibles'));
-    } finally {
-      setAvailabilityLoading(false);
-    }
-  };
-
   const handleConfirm = async () => {
     const doctorId = selectedDoctor?.id;
-    if (!doctorId || !selectedDate || !selectedTime) return;
+    if (!doctorId || !selectedDate || !slots.elegido) return;
 
     if (!selectedPatient) {
       toast.error('Seleccioná un paciente para continuar');
@@ -209,7 +184,7 @@ export function NewAppointmentPage() {
       await appointmentsApi.create({
         doctorId,
         patientId: selectedPatient.id,
-        dateTime: localDateTimeToIso(selectedDate, selectedTime),
+        dateTime: localDateTimeToIso(selectedDate, slots.elegido),
       });
       toast.success('Turno creado correctamente');
       navigate('/turnos');
@@ -457,9 +432,21 @@ export function NewAppointmentPage() {
               />
             </div>
 
-            {availabilityLoading ? (
+            {slots.cargando ? (
               <div className={styles.centered}><Spinner /></div>
-            ) : allSlots.length === 0 ? (
+            ) : slots.error ? (
+              /*
+                El fallo se muestra ACA y no con un aviso flotante. Un toast se
+                va solo a los pocos segundos y deja la pantalla vacia, que se
+                lee igual que "este medico no atiende ese dia" — dos cosas muy
+                distintas para quien esta por reservar.
+              */
+              <div className={styles.noSlots}>
+                <span className={styles.noSlotsIcon}>⚠️</span>
+                <p>{slots.error}</p>
+                <p className={styles.noSlotsHint}>Probá de nuevo en unos segundos.</p>
+              </div>
+            ) : slots.todos.length === 0 ? (
               <div className={styles.noSlots}>
                 <span className={styles.noSlotsIcon}>📅</span>
                 <p>
@@ -475,8 +462,8 @@ export function NewAppointmentPage() {
                   Horarios disponibles para el {formatDisplayDate(selectedDate)}
                 </p>
                 <div className={styles.slotsGrid}>
-                  {allSlots.map(time => {
-                    const isBooked = bookedSlots.has(time);
+                  {slots.todos.map(time => {
+                    const isBooked = slots.ocupados.has(time);
                     return (
                       <button
                         key={time}
@@ -485,9 +472,9 @@ export function NewAppointmentPage() {
                         className={[
                           styles.slot,
                           isBooked            ? styles.slotBooked   : '',
-                          selectedTime === time ? styles.slotSelected : '',
+                          slots.elegido === time ? styles.slotSelected : '',
                         ].filter(Boolean).join(' ')}
-                        onClick={() => !isBooked && setSelectedTime(time)}
+                        onClick={() => !isBooked && slots.elegir(time)}
                       >
                         {time}
                         {isBooked && <span className={styles.slotTag}>Ocupado</span>}
@@ -500,7 +487,7 @@ export function NewAppointmentPage() {
 
             <div className={styles.stepFooter}>
               <Button variant="secondary" onClick={goBack}>← Volver</Button>
-              <Button variant="primary" disabled={!selectedTime} onClick={goForward}>
+              <Button variant="primary" disabled={!slots.elegido} onClick={goForward}>
                 Siguiente →
               </Button>
             </div>
@@ -540,7 +527,7 @@ export function NewAppointmentPage() {
               </div>
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel}>Hora</span>
-                <span className={styles.summaryValue}>{selectedTime}</span>
+                <span className={styles.summaryValue}>{slots.elegido}</span>
               </div>
             </div>
 

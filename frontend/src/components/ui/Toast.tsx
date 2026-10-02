@@ -1,6 +1,7 @@
 import {
   createContext,
   useCallback,
+  useMemo,
   useContext,
   useRef,
   useState,
@@ -59,14 +60,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
-  const toast = {
-    success: (message: string) => addToast('success', message),
-    error: (message: string) => addToast('error', message),
-    info: (message: string) => addToast('info', message),
-  };
+  /*
+   * `toast` y el valor del contexto se memorizan, y no es cosmetico.
+   *
+   * Creados en cada render, cada aviso que aparece o desaparece le entrega un
+   * objeto nuevo a TODOS los consumidores: se re-renderizan aunque no tengan
+   * nada que ver, y cualquier efecto que dependa de `toast` vuelve a correr.
+   *
+   * Por eso media docena de pantallas omitian `toast` de sus dependencias para
+   * no entrar en bucle. Omitirlo callaba al linter y dejaba al efecto mintiendo
+   * sobre de que depende.
+   */
+  const toast = useMemo(
+    () => ({
+      success: (message: string) => addToast('success', message),
+      error: (message: string) => addToast('error', message),
+      info: (message: string) => addToast('info', message),
+    }),
+    [addToast],
+  );
+
+  const valor = useMemo(() => ({ toast }), [toast]);
 
   return (
-    <ToastContext.Provider value={{ toast }}>
+    <ToastContext.Provider value={valor}>
       {children}
       {createPortal(
         <div className={styles.container} aria-live="polite" aria-atomic="false">
