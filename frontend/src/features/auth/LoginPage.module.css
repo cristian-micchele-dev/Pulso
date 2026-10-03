@@ -242,3 +242,77 @@
   accent-color: var(--primary);
   cursor: pointer;
 }
+
+/*
+ * Acceso de un clic a la demo.
+ *
+ * La contrasena tiene espacios y se copia de un posteo: errar al tipearla es lo
+ * normal, y cinco errores sobre la misma cuenta la bloquean para TODOS porque el
+ * contador es por cuenta, no por visitante. Esto ataca la causa en vez de
+ * debilitar el bloqueo, que es una funcionalidad del producto.
+ *
+ * Va DEBAJO del formulario y con peso visual menor: quien tiene credenciales
+ * reales entra por arriba; esto es la salida para el visitante.
+ */
+.demo {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.demoLabel {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.demoBotones {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.demoBoton {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.demoBoton:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.demoBoton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/*
+ * La salida cuando la cuenta quedo bloqueada. Aparece pegada al error y no entre
+ * los botones de abajo: ahi es donde esta mirando quien acaba de fallar.
+ */
+.sugerencia {
+  padding: 0.625rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.sugerencia:hover:not(:disabled) {
+  text-decoration: underline;
+}

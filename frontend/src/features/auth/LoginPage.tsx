@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { apiErrorMessage } from '../../api/client';
+import { CUENTAS_DEMO, alternativaA, type CuentaDemo } from './demoAccounts';
 import styles from './LoginPage.module.css';
 
 /**
@@ -26,22 +27,43 @@ export function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  /** Cuenta que ofrecer cuando la elegida quedó bloqueada por intentos fallidos. */
+  const [sugerida, setSugerida] = useState<CuentaDemo | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function entrar(unEmail: string, unaPassword: string) {
     setError('');
+    setSugerida(null);
     setIsLoading(true);
 
     try {
-      await login(email, password, rememberMe);
+      await login(unEmail, unaPassword, rememberMe);
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       // El cliente rechaza con un objeto plano (ApiError), no con un Error: un
       // `instanceof Error` acá se comía el motivo y mostraba siempre el genérico.
       setError(apiErrorMessage(err, 'Credenciales incorrectas. Intentá de nuevo.'));
+
+      // El bloqueo se vence solo en unos minutos, pero quien llega justo en ese
+      // momento ve un error y se va creyendo que la demo está rota. Si la
+      // cuenta es de la demo, se le ofrece otra que sí entra.
+      if ((err as { code?: string }).code === 'ACCOUNT_LOCKED') {
+        setSugerida(alternativaA(unEmail));
+      }
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    await entrar(email, password);
+  }
+
+  /** Completa el formulario y entra: un clic, sin tipear la contraseña. */
+  async function entrarComo(cuenta: CuentaDemo) {
+    setEmail(cuenta.email);
+    setPassword(cuenta.password);
+    await entrar(cuenta.email, cuenta.password);
   }
 
   return (
@@ -114,6 +136,17 @@ export function LoginPage() {
             </div>
           )}
 
+          {sugerida && (
+            <button
+              type="button"
+              className={styles.sugerencia}
+              onClick={() => entrarComo(sugerida)}
+              disabled={isLoading}
+            >
+              Entrar como {sugerida.etiqueta.toLowerCase()} en su lugar
+            </button>
+          )}
+
           <Button
             type="submit"
             variant="primary"
@@ -124,6 +157,23 @@ export function LoginPage() {
             Iniciar Sesión
           </Button>
         </form>
+
+        <div className={styles.demo}>
+          <p className={styles.demoLabel}>Demo pública — entrá con un clic</p>
+          <div className={styles.demoBotones}>
+            {CUENTAS_DEMO.map((cuenta) => (
+              <button
+                key={cuenta.email}
+                type="button"
+                className={styles.demoBoton}
+                onClick={() => entrarComo(cuenta)}
+                disabled={isLoading}
+              >
+                {cuenta.etiqueta}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className={styles.footer}>
           <Link to="/forgot-password" className={styles.link}>
