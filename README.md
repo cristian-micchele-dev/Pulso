@@ -147,7 +147,7 @@ src/
 | Observabilidad | Logs JSON con `pino` y `x-request-id` de punta a punta, métricas Prometheus | — |
 | Escala | Sockets repartidos entre instancias vía Postgres `LISTEN/NOTIFY` | — |
 | Tests | Jest (unit · e2e · integration) | Vitest + Testing Library |
-| Calidad | ESLint, `tsc --noEmit`, coverage ≥ 77 % | oxlint, `tsc --noEmit` |
+| Calidad | ESLint, `tsc --noEmit`, coverage ≥ 82 % (sin contar scripts de seed ni el cableado de módulos) | oxlint, `tsc --noEmit` |
 
 ---
 
@@ -266,7 +266,7 @@ cinco minutos.
 ```bash
 # Backend
 cd backend
-npm test                     # unit (con coverage gate 77 %)
+npm test                     # unit (con coverage gate 82 %)
 npm run test:e2e             # HTTP end-to-end con repositorios en memoria
 npm run test:integration     # contra PostgreSQL real (se saltea si no hay DATABASE_URL)
 npm run lint && npx tsc --noEmit

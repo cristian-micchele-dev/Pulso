@@ -1,5 +1,5 @@
-import { pdfDeMuestra } from './seed-demo';
-import { sniffFileType } from '../shared/infra/files/sniff';
+import { pdfDeMuestra } from './sample-pdf';
+import { sniffFileType } from './sniff';
 
 describe('pdfDeMuestra', () => {
   it('produce un PDF que el backend reconoce como tal', () => {

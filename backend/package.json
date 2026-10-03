@@ -89,14 +89,16 @@
       "!src/database/data-source.ts",
       "!src/database/typeorm.module.ts",
       "!src/database/migrations/**",
+      "!src/database/seed-*.ts",
+      "!src/**/*.module.ts",
       "!src/**/adapters/persistence/**"
     ],
     "coverageThreshold": {
       "global": {
-        "branches": 75,
-        "functions": 77,
-        "lines": 77,
-        "statements": 77
+        "branches": 76,
+        "functions": 79,
+        "lines": 82,
+        "statements": 82
       }
     },
     "testEnvironment": "node",
