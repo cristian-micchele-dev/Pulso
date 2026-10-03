@@ -5,3 +5,6 @@ uploads/
 .env
 .env.*
 !.env.example
+
+# Cache incremental de TypeScript: se regenera, no se versiona.
+*.tsbuildinfo
